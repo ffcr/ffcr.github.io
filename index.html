@@ -63,9 +63,9 @@
 <body onload="timerStart();">
 <h3>请使用chrome浏览器，否则很可能保存失败</h3>
 <form>
-尝试在<input type="number" id="timeLimit" value="60" autocomplete="off">秒内打出用7z等压缩软件压缩后尽可能大的文本（允许对文本内容复制粘贴）
+尝试在<input type="number" id="timeLimit" value="60" autocomplete="off">秒内打字打出用7z等压缩软件压缩后尽可能大的文本
 </form>
-<textarea id="txt" rows="32" style="width:100%;overflow:auto;" disabled="true"></textarea>
+<textarea id="txt" rows="32" style="width:100%;overflow:auto;" disabled="true" onpaste="return false;"></textarea>
 <button id="btn" type="button" onclick="typeTest()">start</button>
 <a id="down"></a>
 </body>
