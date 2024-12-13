@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>八叉树测试</title>
+<style>
+body {
+	background: #000000;
+}
+canvas {
+	image-rendering: pixelated;
+	display: block;
+	margin: 0 auto;
+	background: #00000000;
+	position:absolute;
+	top:0;
+	left:0;
+	overflow:hidden;
+	opacity:1.0;
+}
+#div1 {
+	position:fixed;
+	bottom:0; right:0;
+	color:#FFFFFF
+}
+#divDebugInf {
+	position:fixed;
+	top:0; left:0;
+	color:#FFFFFF
+}
+</style>
+<noscript><h1>js未启用，请修改浏览器设置或更换浏览器</h1></noscript>
+<script src="util.js"></script>
+<script src="keyCode.js"></script>
+<script src="m3.js"></script>
+<script src="m4.js"></script>
+<script type="text/javascript">
+let perprocess=[];
+let renderer=[];
+let game={MENU:true};
+let player={mat:m4.identity(),speed:1};
+let glsl={};
+
+let mouse=[0,0,0],keyDowns={},showKeyCode=false;
+let RAF=(window.requestAnimationFrame||window.webkitRequestAnimationFrame||window.mozRequestAnimationFrame||window.oRequestAnimationFrame||window.msRequestAnimationFrame||function(callback){window.setTimeout(callback, 1000 / 60);}).bind(window);
+
+
+
+const TEXTURE_TYPES={};
+var textures=[],rectProg=[];
+function genTexture(name,type,w,h,initData){
+	var typeT=TEXTURE_TYPES[type];
+	if(!typeT)return;
+	var fb = gl.createFramebuffer();
+	gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
+	var t=gl.createTexture();
+	gl.bindTexture(gl.TEXTURE_2D,t);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.texImage2D(gl.TEXTURE_2D,0,typeT[0],w,h,0,typeT[2],type,initData);
+	gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+	t.width=w;t.height=h;t.type=type;t.frameBuffer=fb;t.target=gl.TEXTURE_2D;
+	textures[name]=t;
+	//alert(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
+	return t;
+}
+function readTexture(name,viewport){
+	var t=textures[name];
+	if(t==null)return null;
+	var typeT=TEXTURE_TYPES[t.type];
+	var x,y,x1,y1;
+	if(viewport!=null){x=viewport[0];y=viewport[1];x1=viewport[2];y1=viewport[3];}
+	else {x=0;y=0;x1=t.width;y1=t.height;}
+	var a=new (typeT[1])((x1-x)*(y1-y)*4);
+	gl.bindFramebuffer(gl.FRAMEBUFFER,t.frameBuffer);
+	gl.readPixels(x,y,x1,y1,typeT[2],t.type,a);
+	return a;
+}
+function writeTexture(name,buf,viewport){
+	var t=textures[name];
+	if(t==null)return null;
+	var typeT=TEXTURE_TYPES[t.type];
+	var x,y,x1,y1;
+	if(viewport!=null){x=viewport[0];y=viewport[1];x1=viewport[2];y1=viewport[3];}
+	else {x=0;y=0;x1=t.width;y1=t.height;}
+	
+	gl.bindTexture(gl.TEXTURE_2D,t);
+	
+	var wh=(x1-x)*(y1-y);
+	if(buf.length<wh){
+		var b1=new (buf.constructor)(wh*4);
+		b1.set(buf);
+		buf=b1;
+		alert(buf);
+	}
+	gl.texSubImage2D(gl.TEXTURE_2D, 0,x,y,x1-x,y1-y,typeT[2] ,t.type,buf,0);
+}
+function rectRender(program,out,viewport,...ins){//ins:name type value
+	var p=rectProg[program];if(!p)throw("not find program "+program);
+	var t=out===canvas?{}:textures[out];if(!t)throw("not find texture "+out);
+	gl.useProgram(p);
+	for(a of ins){
+		var n=gl.getUniformLocation(p,a[0]);
+		if(isNaN(a[1])){
+			gl['uniform'+a[1]](n,...(a.slice(2)));
+		}else{//texture
+			gl.activeTexture(gl.TEXTURE0+a[1]);
+			gl.bindTexture(gl.TEXTURE_2D,textures[a[2]]);
+			gl.uniform1i(n,a[1]);
+		}
+	}
+	gl.bindFramebuffer(gl.FRAMEBUFFER,t?.frameBuffer);
+	if(viewport!=null)gl.viewport(...viewport);
+	else gl.viewport(0,0,t.width,t.height);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+	//gl.flush();
+}
+function genRectProgram(n,fs){
+	if(!gl.rect_vertex_shader){
+		gl.shaderSource(gl.rect_vertex_shader=gl.createShader(gl.VERTEX_SHADER),
+`#version 300 es
+out vec2 pos;
+void main() {
+	int i=gl_VertexID;
+	pos = vec2(i&1,i>>1);
+	gl_Position = vec4(pos*2.-1.,0.,1.);
+}
+		`);
+		gl.compileShader(gl.rect_vertex_shader);
+	}
+	var t0=timerStart();
+	var s=gl.createShader(gl.FRAGMENT_SHADER);
+	var add='#version 300 es\nprecision highp float;\n';
+	if(fs.indexOf('isampler2D')>=0)add+='precision highp isampler2D;\n';
+	if(fs.indexOf('usampler2D')>=0)add+='precision highp usampler2D;\n';
+	
+	gl.shaderSource(s,add+fs);
+	gl.compileShader(s);
+	if (!gl.getShaderParameter(s,gl.COMPILE_STATUS))
+		throw new Error("--source--\n"+(add+fs)+"\n\n--error--" + gl.getShaderInfoLog(s));
+	var program=gl.createProgram();
+	gl.attachShader(program,gl.rect_vertex_shader);
+	gl.attachShader(program,s);
+	gl.linkProgram(program);
+	console.log('%c compile '+n+' used '+timerEnd(t0),'color:green');
+	rectProg[n]=program;
+	return program;
+}
+function compileShader(src,type){
+	let s=gl.createShader(type);
+	gl.shaderSource(s,src);
+	gl.compileShader(s);
+	if (!gl.getShaderParameter(s,gl.COMPILE_STATUS))
+		throw new Error("shader compile error\n\n--source--\n"+src+"\n\n--error--" + gl.getShaderInfoLog(s));
+	return s;
+}
+function genProgram(...s){
+	let p=gl.createProgram();
+	for(let a of s)gl.attachShader(p,a);
+	gl.linkProgram(p);
+	if(!gl.getProgramParameter(p,gl.LINK_STATUS))
+		throw new Error('Could not compile WebGL program. \n\n' + gl.getProgramInfoLog(p));
+	return p;
+}
+function perprocessShader(src){
+	var add='#version 300 es\nprecision highp float;\n';
+	if(src.indexOf('isampler2D')>=0)add+='precision highp isampler2D;\n';
+	if(src.indexOf('usampler2D')>=0)add+='precision highp usampler2D;\n';
+	return add+src;
+}
+function autoGenProgram(v,f){
+	return genProgram(
+	compileShader(perprocessShader(v),gl.VERTEX_SHADER),
+	compileShader(perprocessShader(f),gl.FRAGMENT_SHADER)
+	);
+}
+
+function renderData(program,...alls){//ins:name type value
+for(let DATA of alls){
+	let {data,name,type,config}=DATA;
+	let texCount=0;
+	if(data instanceof Float32Array.__proto__){
+		var loc = gl.getAttribLocation(program, name);
+		gl.enableVertexAttribArray(loc);
+		
+		
+		var buffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+		gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);
+		
+		let size = +type[0],t;
+		let offset=config?.offset||0,stride=config?.stride||0;
+		if(t=({f:gl.FLOAT,hf:gl.HALF_FLOAT})[type.slice(1)])
+			gl.vertexAttribPointer(loc,size,t,false,stride,offset);
+		else if(t=({b:gl.BYTE,ub:gl.UNSIGNED_BYTE,s:gl.SHORT,us:gl.UNSIGNED_SHORT,i:gl.INT,u:gl.UNSIGNED_INT})[type.slice(1)])
+			gl.vertexAttribIPointer(loc,size,t,stride,offset);
+		else throw 'unknown type '+type;
+	}else{
+		var loc = gl.getUniformLocation(program, name);
+		if(data instanceof WebGLTexture){
+			gl.activeTexture(gl.TEXTURE0+texCount);
+			gl.bindTexture(data.target,data);
+			gl.uniform1i(loc,texCount);
+			texCount++;
+		}else if('uniform'+type in gl){
+			gl['uniform'+type](loc,...data);
+		}else throw 'uniform'+type+' not in gl';
+	}
+	//gl.flush();
+}
+}
+
+
+window.onload = function () {
+	console.log('todo:new file main.js\n');
+	console.log('%cuse showKeyCode=true','color:yellowgreen');
+	canvas=document.getElementById('canvas1');
+	
+	let getMouse=function(ev){
+		if(ev==null){mouse[2]=0;return;}
+		mouse[2]=1;
+		if (ev.targetTouches) ev = ev.targetTouches[0];
+		mouse[0] = (ev.pageX-canvas.offsetLeft+.5)/canvas.style.width.slice(0,-2);
+		mouse[1] = (canvas.style.height.slice(0,-2)-(ev.pageY-canvas.offsetTop)+.5)/canvas.style.height.slice(0,-2);
+	}
+	canvas.ontouchstart=function ( ev ) {
+		ev.preventDefault();
+		getMouse(ev);
+	}
+	canvas.ontouchend = function ( ev ) {
+		ev.preventDefault();
+		getMouse(null);
+	}
+	canvas.ontouchmove = function ( ev ) {
+		ev.preventDefault();
+		if(mouse[2])getMouse(ev);
+	}
+	canvas.oncontextmenu=function(ev){
+		ev.preventDefault();
+	}
+	canvas.onmousedown = function ( ev ) {
+		getMouse(ev);
+	}
+
+	canvas.onmouseup = function ( ev ) {
+		getMouse(null);
+	}
+	canvas.onmousemove = function ( ev ) {
+		if(mouse[2])getMouse(ev);
+	}
+	
+	let resizeListener=()=>{
+		canvas.width = window.innerWidth;
+		canvas.height = window.innerHeight;
+	};
+	resizeListener();
+	window.addEventListener("resize",resizeListener, false);
+	
+	document.addEventListener("keydown",function(e){
+		keyDowns[e.keyCode]=true;
+		if(e.keyCode==27){
+			game.MENU=!game.MENU;
+			for(let t of ['div1','divDebugInf'])document.getElementById(t).style.display=game.MENU?"":"none";
+		}
+		if(1==(1|e.keyCode-33)){
+			player.speed*=e.keyCode-33?.5:2;
+			console.log('speed='+player.speed);
+		}
+		if(showKeyCode)console.log(e.keyCode);
+	});
+	document.addEventListener("keyup",function(e){
+		delete keyDowns[e.keyCode];
+	});
+	
+	
+	
+	gl = canvas.getContext("webgl2",
+		{
+			alpha: true,
+			depth: true,
+			stencil: false,
+			antialias: true,
+			preserveDrawingBuffer: false
+			//* `alpha`：值为true，表示为上下文创建一个Alpha通道缓冲区；默认值为true；
+			//* `depth`：值为true，表示可以使用16位深缓冲区；默认值为true；
+			//* `stencil`：值为true，表示可以使用8位模板缓冲区；默认值为false；
+			//* `antialias`：值为true，表示将使用默认机制执行抗锯齿操作；默认值为true。
+			//* `premultipliedAlpha`：值为true，表示绘图缓冲区有预乘Alpha值；默认为true;
+			//* `preserveDrawingBuffer`：值为true；表示在绘图完成后保留绘图缓冲区；默认值为false。
+		}
+	);
+	if (!gl){
+		alert((!canvas.getContext('experimental-webgl'))?"不支持实验性webgl，请尝试重启或升级设备":"不支持webgl2，请升级或更换浏览器");
+		return;
+	}
+	gl.getExtension('EXT_color_buffer_float');
+	
+	TEXTURE_TYPES[gl.FLOAT]=[gl.RGBA32F,Float32Array,gl.RGBA];
+	TEXTURE_TYPES[gl.INT]=[gl.RGBA32I,Int32Array,gl.RGBA_INTEGER];
+	TEXTURE_TYPES[gl.UNSIGNED_INT]=[gl.RGBA32UI,Uint32Array,gl.RGBA_INTEGER];
+	
+	/*
+	genRectProgram('render',glsl['fsRender']);
+	
+	genRectProgram('fsStart',glsl['fsStart']);
+	genRectProgram('fs1',glsl['fs1']);
+	
+	test1={w:128,h:128,t:false,f:1};
+	genTexture('t0',gl.FLOAT,test1.w,test1.h);
+	genTexture('t1',gl.FLOAT,test1.w,test1.h);
+	rectRender('fsStart','t0');
+	
+	document.getElementById('frame60').addEventListener("change", function(event) {
+		test1.f=this.value;
+	});
+	*/
+	
+	
+	
+	
+	
+	perprocess.forEach(f=>f());
+	client_tick();
+}
+let FPS={start:timerStart(),count:0},renderInterval={value:0,count:0};
+function client_tick(){
+	/*
+	for(var a=0;a<test1.f;a++){
+		test1.t=!test1.t;
+		rectRender('fs1',test1.t?'t1':'t0',null,['ONE','2f',1/test1.w,1/test1.h],['last',0,test1.t?'t0':'t1'],['ran0','1f',Math.random()]);
+	}
+	rectRender('render',canvas,[0,0,canvas.width,canvas.height],['tex',0,'t0']);
+	*/
+ 
+	
+	{	
+		let mov=[0,0,0];
+		for(let a=0;a<6;a++)if(keyDowns["ADZ WS".charCodeAt(a)])mov[Math.floor(a/2)]+=(a&1?1:-1)*(player.speed/60);
+		m4.translate(player.mat,...mov,player.mat);
+		let rot=[0,0,0];
+		for(let a=0;a<6;a++)if(keyDowns["IKJLUO".charCodeAt(a)])rot[Math.floor(a/2)]+=(a&1?-1:1)*(Math.PI/60);
+		
+		let ang=m4.length(rot);if(ang)m4.axisRotate(player.mat,rot,ang,player.mat);
+	}
+	if(++renderInterval.count>renderInterval.value){
+		renderInterval.count=0;
+		//gl.enable(gl.CULL_FACE);
+		gl.enable(gl.DEPTH_TEST);
+		gl.viewport(0,0,canvas.width,canvas.height);
+		//gl.clearColor(0, 0, 0, 0);
+		//gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+		
+		// Create set of attributes
+		//var vao = gl.createVertexArray();
+		//gl.bindVertexArray(vao);
+		renderer.forEach(f=>f());
+	}
+	FPS.count++;
+	if(timerEnd(FPS.start)/1000>=.5){
+		divFPS.innerText='FPS:'+(FPS.count/(timerEnd(FPS.start)/1000)).toFixed(3);
+		FPS.start=timerStart();FPS.count=0;
+	}
+	RAF(client_tick);
+}
+</script>
+</head>
+<script src="test1.js"></script>
+<script src="fs1.glsl"></script>
+<script src="fsStart.glsl"></script>
+<script src="fsRender.glsl"></script>
+<script src="test1.glsl"></script>
+
+<body>
+<canvas id="canvas1" oncontextmenu="self.event.returnvalue=false"></canvas>
+<div id="div1">
+渲染间隔<input type="number" id="renderInterval" value="0" autocomplete="off" onchange="renderInterval.value=this.value">
+</div>
+<div id="divDebugInf">	
+<div>W S A D SPACE Z ： 前后左右上下</div>
+<div>I K J L U O ： 视角 上下左右 左滚 右滚</div>
+<div>PageUp PageDown ： 加减速</div>
+<div id="divFPS"></div>
+</div>
+</body></html>

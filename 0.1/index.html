@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>世界运行</title>
+<style>
+canvas {
+  image-rendering: pixelated;
+}
+</style>
+<script type="text/javascript">
+function timerStart(){return new Date().getTime();}
+function timerEnd(t){return timerStart()-t;}
+
+Math.floormod=function(x,y){
+	//if((y&(y-1))==0)return (y-1)&x;
+	x=~~x;
+	return x>=0?x%y:x%y+y;
+}
+Math.part=function(l,n,a){let d=l/n;return [~~(a*d),~~((a+1)*d)-~~(a*d)]}//return start,len
+
+Array.prototype.shuffle = function() {
+  let m = this.length, i;
+  while (m) {
+    i = (Math.random() * m--) >>> 0;
+    [this[m], this[i]] = [this[i], this[m]]
+  }
+  return this;
+}
+Array.prototype.unique=function(){
+	let ret=[];
+	for (let i = 0;i<ar.length;i++){
+		if (ret.findIndex(o=>o==ar[i])<0){
+			ret.push(ar[i]);
+		}
+	}
+	return ret;
+}
+
+let upd=[];
+let env={
+	get:function(p){return this.data[p.index];},
+	set:function(p,e){
+		this.data[p.index]=e;
+		this.update(p);
+	},
+	update:function(p){
+		upd.push(p);
+	},
+	init:function(){
+		this.lenX=canvas.width;this.lenY=canvas.height;
+		this.data=Array(this.lenX*this.lenY);
+		this.blockBuffer=Array(this.data.length);
+		/*test*/
+		let k=0;
+		for(let y=0;y<this.lenY;y++)
+		for(let x=0;x<this.lenX;x++){
+			this.data[k++]='('+x+','+y+')';
+		}
+		/**/
+		delete this.init;
+	},
+	getBlock:function(rx,ry){
+		let x=Math.floormod(rx,this.lenX);
+		let y=Math.floormod(ry,this.lenY);
+		let i=x+y*this.lenX;
+		return this.blockBuffer[i]||(this.blockBuffer[i]=new this.Block(x,y,i));
+	},
+	Block:class{
+		constructor(x,y,i){
+			this.x=x;
+			this.y=y;
+			this.index=i;
+		}
+		pos(x,y){
+			return env.getBlock(this.x+x,this.y+y);
+		}
+		get E(){
+			return env.get(this);
+		}
+		set E(e){
+			env.set(this,e);
+		}
+		near4(){return [this.pos(-1,0),this.pos(1,0),this.pos(0,-1),this.pos(0,1),];}
+		near5(){return [this,this.pos(-1,0),this.pos(1,0),this.pos(0,-1),this.pos(0,1),];}
+		near8(){return [this.pos(-1,0),this.pos(1,0),this.pos(0,-1),this.pos(0,1),this.pos(-1,-1),this.pos(1,1),this.pos(1,-1),this.pos(-1,1)];}
+		near9(){return [this,this.pos(-1,0),this.pos(1,0),this.pos(0,-1),this.pos(0,1),this.pos(-1,-1),this.pos(1,1),this.pos(1,-1),this.pos(-1,1)];}
+		nearR(r,self,func){
+			let a=[];
+			for(let x=-r;x<=r;x++)
+			for(let y=-r;y<=r;y++){
+				let p=this.pos(x,y);
+				if((self||x!=0||y!=0)&&(func===undefined||func(p)))a.push(p);
+			}
+			return a;
+		}
+	},
+};
+
+/*Object.defineProperty(this,"E",{
+	get:function(){
+		return env.get(this);
+	},
+	set:function(e){env.set(this,e);}
+});*/
+
+let canvas,ctx,imgData,select;
+let fps=60;
+function updateRender(p){
+	let e=env.get(p);
+	let xp=Math.part(canvas.width,env.lenX,p.x);
+	let yp=Math.part(canvas.height,env.lenY,p.y);
+	let xl=xp[1],yl=yp[1];
+	let ixl=1/xl,iyl=1/yl;
+	let r=e instanceof Object&&e.render instanceof Function;
+	for(let b=0;b<yl;b++)
+	for(let a=0;a<xl;a++){
+		let i=4*(a+xp[0]+(b+yp[0])*canvas.width);
+		
+		let f;
+		if(r)f=e.render((a+.5)*ixl,(b+.5)*iyl,xl,yl);
+		if(f instanceof Array){
+			imgData.data[i]=f[0]*256;
+			imgData.data[i+1]=f[1]*256;
+			imgData.data[i+2]=f[2]*256;
+			imgData.data[i+3]=f[3]*256;
+		}else{imgData.data[i]=imgData.data[i+1]=imgData.data[i+2]=imgData.data[i+3]=0;}
+	}
+}
+/*function renderAll(){
+	for(let x=0;x<env.lenX;x++)
+	for(let y=0;y<env.lenY;y++){
+		updateRender(x,y);
+	}
+}*/
+let E1=class{
+	constructor(h){
+		this.energy=h;
+	}
+	tick(p){
+		if((this.energy-=.001*(1+Math.random()))<0.02)return p.E=new Plant(this.energy);
+		env.update(p);
+		let _8=p.near8();
+		let want_move=1;
+		{
+			let arr=_8.filter(e=>(e.E instanceof E1)||e.E instanceof Plant);
+			if(arr.length>0){
+				let e=arr[~~(Math.random()*arr.length)].E;
+				let a=e instanceof Plant?0.2*e.energy:0.05*e.energy;
+				this.energy+=a;
+				e.energy-=a;
+				if(e instanceof Plant)want_move=.001;
+				else want_move=e.energy>this.energy?0:1;
+			}
+		}
+		if(Math.random()<want_move){
+			let arr=_8.filter(e=>!(e.E instanceof Object&&e.E.tick instanceof Function));
+			if(arr.length>0){
+				let p1=arr[~~(Math.random()*arr.length)];
+				if(this.energy>2.0){
+					p1.E=new E1(this.energy*.2);
+					this.energy*=.7;
+				}else{
+					this.energy-=.005;
+					[p1.E,p.E]=[p.E,p1.E];
+				}
+			}
+		}
+	}
+	render(x,y){
+		return [this.energy,0,.3,1];
+	}
+}
+class Plant{
+	constructor(h){
+		this.energy=h;
+		this.time=0;
+	}
+	tick(p){
+		this.time++;
+		if((this.energy+=.002)<.01)return p.E=null;
+		env.update(p);
+		let _8=p.near8();
+		{
+			let arr=_8.filter(e=>e.E instanceof Plant&&e.E.energy>this.energy);
+			if(arr.length>0){
+				let e=arr[~~(Math.random()*arr.length)].E;
+				let a=0.001*(e.energy-this.energy);
+				this.energy+=a;
+				e.energy-=a;
+			}
+		}
+		if(this.energy>0.5&&Math.random()<.1){
+			let arr=p.nearR(1,false,e=>
+				!(e.E instanceof Object&&e.E.tick instanceof Function)
+				&&e.nearR(2).filter(e=>e.E instanceof Object&&e.E.energy>0).length<4
+			);
+			if(arr.length>0){
+				let p1=arr[~~(Math.random()*arr.length)];
+				let a=this.energy*.02;
+				this.energy-=a;
+				p1.E=new Plant(a);
+			}
+		}
+	}
+	render(x,y){
+		//let a=Math.sin(0.003*this.energy*this.time)*.4+.6;
+		//let a=Math.log(this.energy)-.1;
+		let a=this.energy;
+		return [.2,a,0.2,1];
+	}
+}
+function start(){
+	canvas=document.getElementById('canvas1');
+	canvas.onmousedown=function(ev){
+		console.log(select=env.getBlock(ev.offsetX*canvas.width/canvas.offsetWidth,ev.offsetY*canvas.height/canvas.offsetHeight));
+	}
+	ctx = canvas.getContext('2d');
+	imgData=ctx.getImageData(0, 0, canvas.width, canvas.height);
+	env.init();
+	tick();
+	
+	
+	for(let y=0;y<env.lenY;y++)
+	for(let x=0;x<env.lenX;x++){
+		if(Math.random()<.001)env.getBlock(x,y).E=new E1(4);
+		else if(Math.random()<.01)env.getBlock(x,y).E=new Plant(10);
+	}
+/*
+let died={render:function(x,y){return [.5,.5,.5,1];}};
+let life=function(p){
+	let n=0;for(let x=-1;x<2;x++)for(let y=-1;y<2;y++){let p1=p.pos(x,y);if(p1.E==life)n++;}
+	if(!(n<2))p.E=died;
+	else{
+        p.E=p.E;
+		for(let x=-1;x<2;x++)for(let y=-1;y<2;y++){
+			let p1=p.pos(x,y);
+			//if(!(p1.E instanceof Object&&p1.E.render instanceof Function))
+			if(p1.E==died)
+				p1.E=life;
+			else
+				p1.E=died;
+		}
+	}
+};
+life.render=function(x,y){return [1,1,1,1];};
+
+
+
+for(let y=0;y<env.lenY;y++)
+for(let x=0;x<env.lenX;x++)
+	if(Math.random()<.01)env.getBlock(x,y).E=life;
+	
+*/
+}
+
+function tick(){
+	let timeLast=timerStart();
+	let warning=upd.length>1000&&Math.random()<.1;
+	for(let cycle=0;cycle<TPF.value;cycle++){
+		if(warning)console.log('warning,n='+upd.length);
+		
+		if(warning)console.time('random');
+		let arr1={},upd__=[];
+		for(let p of upd){
+			arr1[p.index]=p;
+		}
+		upd=[];
+		for(let i in arr1){
+			let rnd=~~(Math.random()*(1+upd__.length));
+			upd__.push(upd__[rnd]);
+			upd__[rnd]=arr1[i];
+			//upd__.push(arr1[i]);
+		}
+		if(warning)console.timeEnd('random');
+		
+		
+		if(warning)console.time('render');
+		for(let p of upd__)updateRender(p);
+		ctx.putImageData(imgData, 0, 0);
+		if(warning)console.timeEnd('render');
+		
+		
+		if(warning)console.time('tick');
+		for(let p of upd__){
+			let e=p.E;
+			if(e instanceof Object&&e.tick instanceof Function)e.tick(p);
+		}
+		if(warning)console.timeEnd('tick');
+	}
+	let wait=1000/fps-timerEnd(timeLast);
+	setTimeout(tick,wait);
+}
+</script>
+</head>
+
+<body bgcolor="black" onload="start()">
+
+<canvas id="canvas1" width=128 height=128 style="width:512px;height:512px"></canvas>
+<div style="color:white">
+一帧运行
+<input type="decimal" value="1" id="TPF" autocomplete="on"/>
+刻
+</div>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>玩笑般</title>
+    <style>
+        canvas {
+			background: #000000;
+			opacity:1.0;
+			width:100%;
+			height:100%;
+        }
+    </style>
+	<style>
+		#previews {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, 200px);
+			gap: 20px 20px;
+		}
+    </style>
+	<style>
+	
+	</style>
+</head>
+<script src="util.js"></script>
+<script>
+envs=[];
+starts=[];
+client={ticking:true,waitFrame:0,framePerRun:1,tickPerRun:20,mutationRate:0.02,crossoverRate:.01};
+window.onload = function () {
+	starts.forEach(f=>f());
+	client.RAF=(window.requestAnimationFrame||window.webkitRequestAnimationFrame||window.mozRequestAnimationFrame||window.oRequestAnimationFrame||window.msRequestAnimationFrame||function (callback) {
+		window.setTimeout(callback, 1000 / 60);
+	}).bind(window);
+	let run=function(){
+		if(client.ticking&&--client.waitFrame<0){
+			for(let x=0;x<client.tickPerRun;x++){
+				envs.forEach((v,k)=>v.tick());
+			}
+			envs.forEach((v,k)=>v.render());
+			
+			client.waitFrame=client.framePerRun;
+		}
+		client.RAF(run);
+	};
+	for(let a in client){
+		let e=document.getElementById(a);
+		if(!e)continue;
+		e.value=client[a];
+		
+		e.addEventListener('input', function(e1){
+			client[a]=e1.srcElement.value;
+		});
+	}
+	
+	window.setTimeout(run,0);
+}
+</script>
+<body bgcolor="#DDDDDD">
+
+<div id="previews"></div>
+<span style="position:fixed;bottom:0;right:0;">
+<span style="float:left;">
+<div>framePerRun</div>
+<input type="decimal" value="" id="framePerRun" autocomplete="on"/>
+</span>
+<span style="float:left;">
+<div>tickPerRun</div>
+<input type="decimal" value="" id="tickPerRun" autocomplete="on"/>
+</span>
+<span style="float:left;">
+<div>mutationRate</div>
+<input type="decimal" value="" id="mutationRate" autocomplete="on"/>
+</span>
+<span style="float:left;">
+<div>mutationRate</div>
+<input type="decimal" value="" id="crossoverRate" autocomplete="on"/>
+</span>
+<input type="submit" id="su" value="暂停/继续" onclick="client.ticking=!client.ticking">
+<input type="submit" id="ev" value="进化" onclick="evolve();">
+</span>
+<script src="env.js"></script>
+<script>
+function createPreview(e){
+	let p=document.getElementById("previews");
+	if(e.html){e.html.remove();}
+	
+	
+	let d=document.createElement("div");
+	
+	let code=document.createElement("div");
+	let io=document.createElement("div");
+	let name=document.createElement("div");
+	let sub=document.createElement("input");
+	for(let p of [code,io]){
+		//p.style.resize='none';
+		p.style.background='#ffffff';
+		p.style.width="100px";
+		p.style.height="160px";
+		p.style.display='inline-block';
+		p.style.overflow="scroll";
+		p.style["font-size"]="12px";
+		//p.cols=50;
+		//p.rows=10;
+	}
+	name.innerText=e.name;
+	sub.type='submit';
+	let updsub=()=>sub.value=e.alive?'alive':'×';
+	updsub();
+	sub.onclick=()=>{e.alive=!e.alive;updsub();};
+	name.appendChild(sub);
+	d.appendChild(code);
+	d.appendChild(io);
+	d.appendChild(name);
+	p.appendChild(d);
+	
+	e.html={preview:d,code:code,io:io,remove:function(){p.removeChild(this.preview)},submit:sub};
+	e.print=function(x){
+		let io=this.html.io;
+		let s=io.innerText+x;
+		if(s.length>1000)s=s.slice(s.indexOf('\n')+1);
+		io.innerText=s;
+		io.scrollTop = io.scrollHeight;
+		
+	};
+	e.updateCode=function(x){
+		this.html.code.innerText=x;
+	};
+	
+}
+evolve=function(){
+	let len0=envs.length;
+	if(envs.filter(e=>e.alive).length==0){
+		alert("请至少选一个作为进化样本");
+		return;
+	}
+	envs=envs.filter(e=>{if(!e.alive){e.html.remove();return false;}e.html.submit.onclick();return true;});
+	let samp=envs.concat();
+	while(envs.length<len0){
+		let e=new Env(samp.sample());
+		e.mem.forEach((v,k)=>{
+			if(Math.random()<client.crossoverRate)e.mem.set(samp.sample().mem.slice(k),k);
+			if(Math.random()<client.mutationRate)e.mem[k]=~~(Math.random()*4294967296);
+		});
+		createPreview(e);
+		envs.push(e);
+	}
+}
+starts.push(()=>{
+	for(let e of envs)createPreview(e);
+});
+</script>
+
+
+</body>
+
+</html>

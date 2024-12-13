@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<!-- saved from url=(0014)about:internet -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>快速敲键盘</title>
+<style>
+	#canvas {
+		background: #f0f0f0;
+	}
+</style>
+
+<script src="keyCode.js"></script>
+<script type="text/javascript">
+let RAF=(window.requestAnimationFrame||window.webkitRequestAnimationFrame||window.mozRequestAnimationFrame||window.oRequestAnimationFrame||window.msRequestAnimationFrame||function(callback){window.setTimeout(callback, 1000 / 60);}).bind(window);
+
+let keyPressed=[];
+let key_stat={};
+let keyCounter=0;
+let maxRate=0;
+let testing=false;
+
+
+//let keyDowning=[];
+document.addEventListener("keyup",function(e){
+	//delete keyDowning[e.keyCode];
+	keyCounter++;
+	if(testing){
+		let k=e.key,c=e.keyCode;
+		if(c>=96&&c<=111)k='Numpad'+k;
+		if(k=='')k='keyCode#'+c;
+		if(k==' ')k='Space';
+		keyPressed.push({time:timerStart(),key:k});
+		key_stat[k]|=0;
+		key_stat[k]++;
+	}
+});	
+document.addEventListener("keydown",function(e){
+	//keyDowning[e.keyCode]=true;
+	if(testing){
+		e.preventDefault();
+		e.stopPropagation();
+		e.keyCode = 0;
+        e.returnValue = false;
+        return false;
+	}
+});
+document.addEventListener("contextmenu",function(e){
+	if (testing){
+		event.preventDefault();
+		event.stopPropagation();
+		return false;
+	}
+});
+function timerStart(){return new Date().getTime();}
+function timerEnd(t){return timerStart()-t;}
+let startTime;
+let last_pos;
+function testStart(){
+	testing=true;
+	ctx.clearRect(0, 0,canvas.width,canvas.height);
+	last_pos=undefined;
+	update_state();
+	tick();
+}
+function render(){
+	let rate=keyPressed.length/statLimit.value;
+	let x=timerEnd(startTime)/(timeLimit.value*1000),y=rate/100;
+	let pos0=last_pos,pos1=[x*canvas.width,(1-y)*canvas.height];
+	last_pos=pos1;
+	if(!pos0)return;
+
+	ctx.beginPath();
+	ctx.lineWidth = 1;
+	ctx.strokeStyle = 'rgb('+(.1+.9*y)*256+","+(.1)*256+ ','+(.1+.9*(1-y))*256+')';
+	ctx.moveTo(pos0[0],pos0[1]);
+	ctx.lineTo(pos1[0],pos1[1]);
+	ctx.stroke();
+}
+function tick(){
+	while(keyPressed[0]&&(timerEnd(keyPressed[0].time)>statLimit.value*1000))keyPressed.shift();
+	let rate=keyPressed.length/statLimit.value;
+	if(maxRate<rate)maxRate=rate;
+	display.innerText=[
+		"当前速度："+rate+"/s",
+		"平均速度："+Math.round(10000*keyCounter/Math.min(timerEnd(startTime)/1000,timeLimit.value))/10000+"/s",
+		"最大速度"+maxRate+"/s",
+		"敲键盘计数："+keyCounter,
+	].join('\n');
+	let _t=timeLimit.value*1000-timerEnd(startTime);
+	btn.innerHTML="剩下"+(_t/1000)+"秒";
+	render();
+	if(_t<=0){
+		testing=false;
+		update_state();
+		return;
+	}
+	RAF(tick);
+}
+function update_state(){
+	btn.disabled=testing;
+	timeLimit.disabled=testing;
+	statLimit.disabled=testing;
+	if(testing){
+		startTime=timerStart();
+		keyPressed=[];
+		key_stat={};
+		keyCounter=0;
+		maxRate=0;
+	}else{
+		btn.innerHTML = "start";
+		display.innerText+="\n按键排行榜：\n"+Object.entries(key_stat).sort((a,b)=>b[1]-a[1]).map(o=>"按了"+o[1]+"次 "+o[0]).join('\n');
+		//down.href = window.URL.createObjectURL(new Blob([txt.value]));
+		//down.download='type_'+time1+'s.txt';
+		//down.click();
+	}
+	if(testing)window.onbeforeunload=function() {return "离开测试？";};
+	else setTimeout(function(){window.onbeforeunload=null;},1000);//防止不小心在测试完成时退出
+}
+</script>
+</head>
+
+<body>
+
+<form>
+<h3>请注意安全，避免因用力过度受伤或损坏设备</h3>
+<div>尝试在<input type="number" id="timeLimit" value="60" autocomplete="off">秒内按尽量多次数的按键，
+统计<input type="number" id="statLimit" value="1" autocomplete="off">秒内的按键速度峰值</div>
+<div>注意：请尽量避免按下ctrl alt shift等功能键。由于浏览器安全机制，Ctrl+W Ctrl+N等快捷键无法在测试时被禁用。</div>
+</form>
+<!--
+<textarea id="txt" rows="20" style="width:100%;overflow:auto;"></textarea>
+-->
+<canvas id="canvas"></canvas>
+<div>
+<button style="float:right;" id="btn" type="button" onclick="testStart()">start</button>
+<div style="float:left;" id="display"></div></div>
+<!--
+<a id="down"></a>
+-->
+<script>
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight*.6;
+ctx=canvas.getContext('2d');
+</script>
+</body></html>

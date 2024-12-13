@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<!-- saved from url=(0014)about:internet -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<title>高信息熵打字练习</title>
+
+<script type="text/javascript">
+
+	function getObj(Obj){
+	 var index = 0;
+	 var PropertyList='';
+	 var PropertyCount=0;
+	 for(var i in Obj){
+		 PropertyList=PropertyList+i+':'+Obj[i]+'\r\n';
+	 } 
+	 return PropertyList;
+	}
+	//alert(Object.getOwnPropertyNames(WebSocket));
+	
+	function timerStart(){return new Date().getTime();}
+	function timerEnd(t){return timerStart()-t;}
+	var txt,btn,timeInput,down;
+	var stT,time1;
+	function typeTest(){
+		txt=document.getElementById("txt");
+		btn=document.getElementById("btn");
+		timeInput=document.getElementById("timeLimit");
+		down=document.getElementById("down");
+		txt.value="";
+		txt.disabled=false;
+		btn.disabled=true;
+		timeInput.disabled=true;
+		//txt.value=getObj(txt);
+		txt.focus();
+		stT=timerStart();
+		time1=1*timeInput.value;
+		window.onbeforeunload = function() {return "离开测试？";}
+		tick();
+	}
+	function tick(){
+		var _t=time1*1000-timerEnd(stT);
+		if(_t>0){
+			btn.innerHTML="剩下"+(_t/1000)+"秒";
+			setTimeout(tick,10);
+		}else{
+			typeEnd();
+		}
+	}
+	function typeEnd(){
+		txt.disabled=true;
+		btn.disabled=false;
+		timeInput.disabled=false;
+		btn.innerHTML = "start";
+		window.onbeforeunload=null;
+		
+		down.href = window.URL.createObjectURL(new Blob([txt.value]));
+		down.download='type_'+time1+'s.txt';
+		down.click();
+	}
+</script>
+</head>
+
+<body onload="timerStart();">
+<h3>请使用chrome浏览器，否则很可能保存失败</h3>
+<form>
+尝试在<input type="number" id="timeLimit" value="60" autocomplete="off">秒内打字打出用7z等压缩软件压缩后尽可能大的文本
+</form>
+<textarea id="txt" rows="32" style="width:100%;overflow:auto;" disabled="true" onpaste="return false;"></textarea>
+<button id="btn" type="button" onclick="typeTest()">start</button>
+<a id="down"></a>
+
+
+</body></html>

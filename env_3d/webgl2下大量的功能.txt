@@ -1,0 +1,22 @@
+（注意：webgl2相当于gles3.0即opengl4.2）
+
+通用计算
+transformFeedbackVaryings
+https://juejin.cn/post/7056708227056009253
+
+一个属性多个顶点使用（如相同模型，不同矩阵）
+vertexAttribDivisor
+drawArraysInstanced
+https://blog.csdn.net/hyszyl/article/details/62218143
+相当于多个drawArrays
+https://www.cnblogs.com/flyfox1982/p/10070578.html
+
+https://blog.csdn.net/u011760195/article/details/100841291
+各种版本各种draw方法
+以及cpu gpu间高性能的缓存传输（利于游戏逻辑计算）
+
+
+
+功能很多，以后想要图形化做成游戏。
+不过，对于世界运行的意义不算很大。以后可以webGPU，但最好还是native的。
+除非客户端=世界运行。
