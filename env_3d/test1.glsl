@@ -1,6 +1,6 @@
 glsl.test1_v=`
 in vec4 block;
-flat out vec4 id;
+flat out vec4 xyzr;
 uniform mat4 mat;
 out vec4 pos_gl;
 out vec3 pos_world;
@@ -23,7 +23,7 @@ void main() {
 	// Colorspace goes from 0.0 to 1.0
 	texCoord=vec2(gl_VertexID%3==1?1.:0.,gl_VertexID%3==2?1.:0.);
 	pos_world=p;
-	id=block;
+	xyzr=block;
 }
 `
 
@@ -31,7 +31,7 @@ glsl.test1_f=`
 in vec3 pos_world;
 in vec4 pos_gl;
 in vec2 texCoord;
-flat in vec4 id;
+flat in vec4 xyzr;
 uniform mat4 mat;
 uniform vec3 pos_player;
 uniform int visible;
@@ -42,30 +42,34 @@ float findRealDepth(in highp mat4 modelViewProjectinMatrix,in highp vec3 objectP
 	float ndc_depth = clip_space_pos.z / clip_space_pos.w;
 	return (((far-near) * ndc_depth) + near + far) / 2.0;
 }
-void main() {
-	float r=id.w;
-	if(r<0.){
-		if(texCoord.x<.005||texCoord.y<.005||texCoord.x+texCoord.y>.995){//gl_FrontFacing
-			
-		}else discard;
-		outColor=vec4(vec3(.75)+.25*sin(vec3(r*5.,r*7.,r*11.)),1);
-		gl_FragDepth = gl_FragCoord.z;
-		return;
-	}
+
+void render_block_frame(){
+	float r=xyzr.w;
+	if(!gl_FrontFacing)discard;
+	if(!(texCoord.x<.005||texCoord.y<.005||texCoord.x+texCoord.y>.995))discard;
+	outColor=vec4(vec3(.75)+.25*sin(vec3(r*5.,r*7.,r*11.)),1);
+	gl_FragDepth = gl_FragCoord.z;
+}
+void render_ball(){
+	float r=xyzr.w;
 	vec3 A=pos_world,P=pos_player;
 	
-	vec3 Q=id.xyz;
+	vec3 Q=xyzr.xyz;
 	vec3 v=Q-P;
 	vec3 n=normalize(A-P);
 	float PM=dot(n,v);
 	float dd=dot(v,v)-PM*PM;
 	float delta=r*r-dd;
-	if(r>length(v)||delta<0.)discard;
+	if(delta<0.)discard;
 	float near=PM-sqrt(delta);
 	//float far=0.5*(-b+delta);
 	vec3 loc=P+near*n;
 	outColor = vec4(.5+.5*sin(10.*(loc-Q)/r),1);
 	gl_FragDepth = findRealDepth(mat,loc);
-
+}
+void main() {
+	float r=xyzr.w;
+	if(xyzr.w>0.)render_ball();
+	if(xyzr.w<0.)render_block_frame();
 }
 `

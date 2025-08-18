@@ -55,15 +55,15 @@ let objects=[];
 let program=autoGenProgram(glsl.test1_v,glsl.test1_f);
 
 
-let renderBlock=(x,y,z,r)=>{
-	var block = new Float32Array(144);
+let renderObject=(x,y,z,r)=>{//r>0:ball r<0:block frame
+	var block = new Float32Array(144);//6faces*(2triangles*3points)*4xyzr
 	block.set([x,y,z,r]);
 	for(let p=4;p<=256;p<<=1)block.copyWithin(p,0,p);
 	
 	let o={block:block};
 	objects.push(o);
 }
-algorithm=1;
+
 class OcTree{
 	static UID_COUNT=0;
 	constructor(pos,r){
@@ -76,12 +76,15 @@ class OcTree{
 	}
 	test(pos,r){
 		if(r!==undefined){
-			if(algorithm!=1)return m4.distance(this.pos,pos)<=1.7320508075688772*this.r+r;
-			let p1,r1,p2,r2;//r1>r2
-			if(this.r>r)[p1,r1,p2,r2]=[this.pos,this.r,pos,r];
-			else[p2,r2,p1,r1]=[this.pos,this.r,pos,r];
-			for(let i=0;i<3;i++)if(p2[i]-r2>=p1[i]+r1||p2[i]+r2<p1[i]-r1)return false;
-			return true;
+			if(false){//algorithm 1
+				return m4.distance(this.pos,pos)<=1.7320508075688772*this.r+r;
+			}else{//algorithm 2
+				let p1,r1,p2,r2;//r1>r2
+				if(this.r>r)[p1,r1,p2,r2]=[this.pos,this.r,pos,r];
+				else[p2,r2,p1,r1]=[this.pos,this.r,pos,r];
+				for(let i=0;i<3;i++)if(p2[i]-r2>=p1[i]+r1||p2[i]+r2<p1[i]-r1)return false;
+				return true;
+			}
 		}
 		for(let i=0;i<3;i++)if(pos[i]>=this.pos[i]+this.r||pos[i]<this.pos[i]-this.r)return false;
 		return true;
@@ -145,16 +148,16 @@ class OcTree{
 		}
 	}
 	render(){
-		renderBlock(this.pos[0],this.pos[1],this.pos[2],-this.r);
+		renderObject(this.pos[0],this.pos[1],this.pos[2],-this.r);
 		for(let e of this.children)e.render();
 		//for(let e of this.es)e.render();
 	}
 }
 
-let weight1=50,weight2=-400,weight3=100,senseDi=5;
 let boids=[];let ocTree=new OcTree([0,0,0],512);
 class Boid{
-	static maxF=10;
+	static maxF=50;
+	static visibleDistance=10;
 	constructor(pos){
 		this.pos=Float32Array.from(pos);
 		ocTree.push(this);
@@ -166,24 +169,21 @@ class Boid{
 	}
 	think(){
 		let a = new Float32Array(3);
-		let l=0;
-		ocTree.radiusInteract(this.pos,senseDi,boid=>{
-			let sub = m4.subtractVectors(boid.pos,this.pos);
-			let r=m4.length(sub);
-			if(boid!=this&&r>0&&r < senseDi){
-				//let vr=m4.length(boid.v);if(vr>0)vr=1/vr;
-				for(let i=0;i<3;i++){
-					a[i]+=
-					(boid.v[i]-this.v[i])*weight1+
-					sub[i]/(r)*weight2+
-					sub[i]*weight3;
-				}
-				l++;
-			}
+		let inRadius=[];
+		ocTree.radiusInteract(this.pos,Boid.visibleDistance,boid=>{
+			let dx = m4.subtractVectors(boid.pos,this.pos);
+			let r=m4.length(dx);
+			if(!(r!=0&&r < Boid.visibleDistance))return;//exclude self
+			let dv=m4.subtractVectors(boid.v,this.v);
+			inRadius.push([boid,dx,r,dv])
 		});
-		if(l>0)for(let i=0;i<3;i++)a[i]/=l;
+		for(let [boid,dx,r,dv] of inRadius){
+			m4.addVectors(a,m4.scaleVector(dx,Math.min(1000*(r-1),0)),a);//avoid collision
+			m4.addVectors(a,m4.scaleVector(dv,500/inRadius.length),a);//same velocity
+			m4.addVectors(a,m4.scaleVector(dx,100/inRadius.length),a);//average position of neighboring
+		}
+		
 		if(m4.length(a)>Boid.maxF){
-			//console.log(a);
 			m4.scaleVector(m4.normalize(a),Boid.maxF,a);
 		}
 		this.aThink=a;
@@ -195,7 +195,7 @@ class Boid{
 			let a1=this.aThink;
 			let d=m4.cross(a1,a0);
 			
-			this.sleep=.5*(1-m4.lengthSq(d)**.25/Boid.maxF);
+			this.sleep=Math.min(1,.5*(1-m4.lengthSq(d)**.25/Boid.maxF));
 			//if(Math.random()<.001)console.log(this.sleep);
 		}
 		
@@ -211,7 +211,7 @@ class Boid{
 		if(!this.ocTree.test(this.pos))ocTree.push(this);
 	}
 	render(){
-		renderBlock(this.pos[0],this.pos[1],this.pos[2],this.r);
+		renderObject(this.pos[0],this.pos[1],this.pos[2],this.r);
 	}
 	radiusInteract(pos,r,f){
 		if(m4.distanceSq(pos,this.pos)<=r*r)return f(this);
@@ -227,10 +227,13 @@ class Boid{
 let visible=1;
 let render1=function(){
 	objects=[];
-	if(visible==0)return;
-	for(let e of boids)e.render();
-	if(visible==2)ocTree.render();
-	renderBlock(0,0,0,200);
+	if(visible&1){
+		for(let e of boids)e.render();
+	}
+	if(visible&2){
+		ocTree.render();
+	}
+	renderObject(0,0,0,200);
 	
 	
 	gl.useProgram(program);
@@ -270,7 +273,7 @@ div1.appendChild(sub);
 */
 document.addEventListener("keydown",function(e){
 	if(e.keyCode=='V'.charCodeAt(0)){
-		visible=(visible+1)%3;
+		visible=(visible+1)%4;
 	}
 });
 

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>世界运行</title>
+<style>
+canvas {
+  image-rendering: pixelated;
+}
+</style>
+</head>
+
+<body style="background-color: black;">
+
+<canvas id="canvas" width=512 height=512 style="width:512px;height:512px"></canvas>
+<div style="color:white">
+运行速度：每秒
+<input type="number" value="10" id="SPEED"  onchange="this.value=Math.max(1,Math.min(this.value,1000))"/>
+刻
+<input type="submit" id="PAUSE" value="点击暂停" onclick="this.value=(this.pause=!this.pause)?'已暂停，点击继续':'点击暂停'">
+</div>
+<script>
+	function download(file,str){
+		const blob = new Blob([str], { type: 'text/plain;charset=utf-8' }); 
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href=url;a.download=file;
+		document.body.appendChild(a);a.click();
+		setTimeout(() => {document.body.removeChild(a);URL.revokeObjectURL(url);}, 0); 
+	}
+	function upload(then) {
+		const fileInput = document.getElementById('fileInput');
+		
+		const file = fileInput.files[0];if(!file)return;
+		const reader = new FileReader();
+		reader.onload = function (e) {then(e.target.result);};
+		reader.onerror = function () {console.error(" 读取失败:", reader.error);};
+		reader.readAsText(file);
+	}
+</script>
+<div>
+	<input type="submit" id="SAVE" value="保存世界" onclick="download(new Date().toLocaleString('sv').replaceAll(/[:\-]/g,'').replaceAll(' ','-')+'.save.js',uneval(worldToSerializable(WORLD)))">
+	<label style="background: white; color: black; border-radius: 2px; cursor: pointer;">加载世界
+	<input type="file" id="fileInput" style="display: none;" onchange="upload(str=>WORLD=worldFromSerializable(Function(str)()));this.value=''">
+	</label>
+</div>
+
+<script>
+	document.addEventListener('dragover',  (e) => {
+		e.preventDefault();  // 覆盖浏览器默认阻止行为
+	});
+	function openTextEditor(title,currentText, onSave,x=0,y=0) {
+		const editor = document.createElement('div');
+		editor.innerHTML = `
+			<div>${title}</div>
+			<textarea style="display:block;width:300px;height:150px;margin-bottom:8px">${currentText}</textarea>
+			<button style="float: right;" class="save">保存</button>
+			<button style="float: right;" class="cancel">取消</button>
+		`;
+		editor.style.cssText = `background-color:white;position:absolute;z-index:${openTextEditor.zIndex++}`;
+		editor.style.left  = x  + 'px';
+		editor.style.top  = y  + 'px';
+		editor.draggable=true;
+		let dx,dy;
+		editor.addEventListener('dragstart',  (e) => {
+			const rect = editor.getBoundingClientRect();
+			dx = e.clientX-rect.left;
+			dy = e.clientY-rect.top;
+		});
+		editor.addEventListener('dragend',  (e) => {
+			e.preventDefault(); 
+			editor.style.left  = e.clientX-dx  + 'px';
+			editor.style.top  = e.clientY-dy  + 'px';
+		});
+
+		editor.querySelector('.save').onclick = () => {
+			onSave(editor.querySelector('textarea').value);
+			document.body.removeChild(editor);
+		};
+		editor.querySelector('.cancel').onclick = () => document.body.removeChild(editor);
+
+		document.body.appendChild(editor);
+	}
+	openTextEditor.zIndex=1000;
+</script>
+
+
+<script type="module">
+	import {tickLogic} from "./tick.js";
+	import {renderLogic} from "./render.js";
+	let toTick=0,lastTime=new Date();
+	function runTickLoop(){
+		if(document.getElementById('PAUSE').pause)return;
+		toTick+=+document.getElementById('SPEED').value*(new Date()-lastTime)/1000;lastTime=new Date();
+		let deadline=+new Date()+1000/4;//1000刻的耗时可能太长，为了避免一直卡住，最多只允许卡1/4秒
+		while(toTick>=1){
+			tickLogic();toTick--;
+			if(new Date()>deadline){toTick=0;break;}
+		}
+	}
+	setInterval(runTickLoop,1000/60);
+
+	const RAF=(window.requestAnimationFrame||window.webkitRequestAnimationFrame||window.mozRequestAnimationFrame||window.oRequestAnimationFrame||window.msRequestAnimationFrame||function(callback){window.setTimeout(callback, 1000 / 60);}).bind(window);
+	(function runRenderLoop(){
+		renderLogic();
+		window.requestAnimationFrame(runRenderLoop);
+	})();
+
+	
+
+
+	let canvas=document.getElementById('canvas');
+	canvas.onmousedown=function(ev){
+		const width=WORLD[0].length,height=WORLD.length;
+		let x=ev.offsetX*width/canvas.offsetWidth|0,y=ev.offsetY*height/canvas.offsetHeight|0,E=WORLD[y][x];
+		openTextEditor('编辑('+x+','+y+')处程序',uneval(E.program),text=>{E.program=Function(text)()},ev.clientX,ev.clientY);
+	}
+</script>
+
+</body>
+</html>
