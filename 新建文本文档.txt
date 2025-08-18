@@ -1,0 +1,4 @@
+@REM chcp 936
+rem "%DATE%"
+rem "update_%DATE:~0,4%%DATE:~5,2%%DATE:~8,2%"
+pause
