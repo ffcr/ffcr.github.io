@@ -8,12 +8,6 @@ canvas {
   image-rendering: pixelated;
 }
 </style>
-<!--
-<script src="https://unpkg.com/mathjs/lib/browser/math.js"></script>
--->
-<script src="math.js"></script>
-<script src="util.js"></script>
-
 
 <script type="text/javascript">
 let initFunctions=[],tickFunctions=[];
@@ -34,14 +28,21 @@ function start(){
 	for(let f of initFunctions)f();
 	tick();
 }
-let ticking=true;
-function speed_vaild(x){
-	return x>=1&&x<200000;
+
+function shuffle(arr) {
+	let m = arr.length, i;
+	while (m) {
+		i = (Math.random() * m--) >>> 0;
+		[arr[m], arr[i]] = [arr[i], arr[m]]
+	}
+	return arr;
 }
+
+let ticking=true;
 function tick(){
-	let time0=timerStart();
+	let time0=new Date().getTime();
 	let speed=SPEED.value;
-	if(!ticking||!speed_vaild(speed)){
+	if(!ticking){
 		let wait=1000/60;
 		setTimeout(tick,wait);
 		return;
@@ -49,26 +50,16 @@ function tick(){
 
 	let cycle=Math.max(1,Math.round(speed/60));
 	for(let c=0;c<cycle;c++){
-		let arr1={},upd__=[];
-		for(let p of upd){
-			arr1[p.index]=p;
-		}
-		upd=[];
-		for(let i in arr1){
-			let rnd=~~(Math.random()*(1+upd__.length));
-			upd__.push(upd__[rnd]);
-			upd__[rnd]=arr1[i];
-			//upd__.push(arr1[i]);
-		}
+		let upd__=shuffle(upd);upd=[];
 		
 		for(let p of upd__){
 			let e=p.E;
-			if(e instanceof Object&&e.tick instanceof Function)e.tick(p);
+			if(e instanceof Object&&typeof e.tick==="function")e.tick(p);
 		}
 
 		for(let f of tickFunctions)f();
 	}
-	let wait=1000/speed*cycle-timerEnd(time0);
+	let wait=1000/speed*cycle-(new Date().getTime()-time0);
 	setTimeout(tick,wait);
 }
 </script>
@@ -79,7 +70,7 @@ function tick(){
 <canvas id="canvas" width=512 height=512 style="width:512px;height:512px"></canvas>
 <div style="color:white">
 运行速度：每秒
-<input type="decimal" value="100" id="SPEED" autocomplete="on" oninput="SPEED.style.background=speed_vaild(SPEED.value)?'':'red'"/>
+<input type="decimal" value="100" id="SPEED" autocomplete="on"/>
 刻
 <input type="submit" id="PAUSE" value="暂停" onclick="PAUSE.value=(ticking=!ticking)?'暂停':'继续'">
 </div>

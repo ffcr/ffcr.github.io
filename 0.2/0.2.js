@@ -1,7 +1,5 @@
+function sample(a){return a[~~(Math.random()*a.length)];}
 
-
-//READ1 WRITE1(&push) WRITENULL(pop) CLRLIST +-*/&|^(pop) }IF(list[0]){ }{ 
-//-128~127
 function limit(x){return x|0;}
 function ranCmd(){
 	let l=arguments.callee.list;
@@ -41,7 +39,7 @@ function ranCmd(){
 		})
 		arguments.callee.list=l;
 	}
-	return l.sample();
+	return sample(l);
 }
 function compile(gene){
 	let now_var=0;
@@ -67,8 +65,7 @@ class Life{
 		if(typeof a=="number"){this.gene=[];for(let t=0;t<a;t++)this.gene.push(ranCmd());}
 		else this.gene=a;
 		this.program=compile(this.gene);
-		this.direction=[[1,0],[0,1]];
-		for(let j=0,k=~~(4*Math.random());j<k;j++)this.direction=math.multiply(this.direction,[[0,1],[-1,0]]);
+		this.direction=sample([0,1,2,3]);
 		this.energy=h?h:1;
 		this.age=0;
 		
@@ -93,7 +90,8 @@ class Life{
 		return new Life(g,h);
 	}
 	look(x,y){
-		let e=this.pos.pos(...math.multiply(this.direction,[x,y])).E;
+		let e=this.pos.pos(...[[x,y],[-y,x],[-x,-y],[y,-x]][this.direction]).E;
+		
 		switch(e?.constructor){
 			case Life:return -1;
 			case Plant:return 1;
@@ -113,7 +111,7 @@ class Life{
 		this.program.call(this);
 		
 		if(this.ACTION==0){
-			let p1=p.pos(...math.multiply(this.direction,[0,1]));
+			let p1=p.pos(...[[0,1],[-1,0],[-0,-1],[1,-0]][this.direction]);
 			
 			if(p1.E instanceof Plant){
 				this.energy+=p1.E.energy*energy_mul;
@@ -130,14 +128,6 @@ class Life{
 			}else if(p1.E instanceof Stone){
 				this.cost(1);
 				p.E=p.E;
-				// let p2=p.pos(...math.multiply(this.direction,[0,2]));
-				// if(p2.E?.tick)
-				// 	p.E=p.E;
-				// else{
-				// 	p.E=p2.E;
-				// 	p2.E=p1.E;
-				// 	p1.E=this;
-				// }
 			}else{
 				this.cost(.01);
 				p.E=p1.E;
@@ -147,11 +137,11 @@ class Life{
 		}
 		if(this.ACTION==1){
 			this.cost(.01);
-			this.direction=math.multiply(this.direction,[[0,1],[-1,0]]);
+			this.direction=this.direction+1&3;
 		}
 		if(this.ACTION==-1){
 			this.cost(.01);
-			this.direction=math.multiply(this.direction,[[0,-1],[1,0]]);
+			this.direction=this.direction-1&3;
 		}
 		/*if(this.ACTION==-1){
 			this.energy-=.1;
@@ -167,7 +157,7 @@ class Life{
 				let p1s=p.near8().filter(p1=>!(p1.E instanceof Object));
 				if(p1s.length>0){
 					this.cost(spawn_cost);
-					p1s.sample().E=this.spawn();
+					sample(p1s).E=this.spawn();
 				}
 			}
 		}
@@ -184,7 +174,7 @@ class Life{
 		}
 		
 	}
-	render(x,y,xl,yl){x-=.5;x*=2;y-=.5;y*=2;[x,y]=math.multiply([x,y],this.direction);let t=y<0?1:1-x*x-y*y;return [t,t*.1*this.energy,t*.03*this.energy,1];}
+	render(x,y,xl,yl){x-=.5;x*=2;y-=.5;y*=2;[x,y]=[[x,y],[-y,x],[-x,-y],[y,-x]][this.direction];let t=y<0?1:1-x*x-y*y;return [t,t*.1*this.energy,t*.03*this.energy,1];}
 }
 class Plant{
 	constructor(h){
@@ -198,17 +188,17 @@ class Plant{
 		if(this.energy>0.5&&Math.random()<.1){
 			let arr=p.nearR(2,false,e=>!(e.E?.tick)&&e.nearR(2,false,e=>e.E instanceof Plant).length<4);
 			if(arr.length){
-				let p1=arr.sample();
+				let p1=sample(arr);
 				let a=this.energy*.02;
 				this.energy-=a;
 				p1.E=new Plant(a);
 			}else{
 				let arr=p.near4().filter(p1=>(p1.E instanceof Stone));
 				if(arr.length){
-					let p1=arr.sample();
+					let p1=sample(arr);
 					let arr2=p1.near4().filter(p2=>!(p2.E?.tick));
 					if(arr2.length){
-						let p2=arr2.sample();
+						let p2=sample(arr2);
 						[p1.E,p2.E]=[p2.E,p1.E];
 					}
 				}
@@ -241,10 +231,10 @@ let random_add=function(f){
 	b.E=f();
 }
 initFunctions.push(function(){
-	//start.toString().split(/{|}|;/).map(e=>e.replaceAll(/\t|\n/g,'')).filter(e=>e);
 	for(let a=env.lenX*env.lenY*.1;--a>=0;)random_add(()=>new Plant(1));
 	for(let a=env.lenX*env.lenY*.1;--a>=0;)random_add(()=>new Life(10,5));
 	for(let a=env.lenX*env.lenY*.02;--a>=0;)random_add(()=>new Stone());
+	for(let y=0;y<env.lenY;y++)for(let x=0;x<env.lenX;x++)if(x<1||x>env.lenX-2||y<1||y>env.lenY-2)env.getBlock(x,y).E=new Stone();
 })
 tickFunctions.push(function(){
 	if(Math.random()<.001)random_add(()=>Math.random()<.5?new Life(10,5):new Plant(1));

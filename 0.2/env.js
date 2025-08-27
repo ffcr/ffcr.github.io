@@ -1,3 +1,22 @@
+function floormod(x,y){
+	x=~~x;
+	return x>=0?x%y:x%y+y;
+}
+
+
+function applyRotation([x,y], r) {return [[x,y],[-y,x],[-x,-y],[y,-x]][r]}//[y,-x,-y,x,y].slice(3-r,3-r+2)
+function inverseTransform(T) {
+  const rInv = -T[2]&3;
+  const tInv = applyRotation([T[0], T[1]], rInv);
+  return [ -tInv[0], -tInv[1], rInv ];
+}
+function composeTransforms(T1, T2) {
+  const r = (T2[2] + T1[2]) & 3;
+  const t1Rot = applyRotation([T1[0], T1[1]], T2[2]);
+  return [ T2[0] + t1Rot[0], T2[1] + t1Rot[1], r ];
+}
+
+
 let upd=[];
 let env={
 	get:function(p){return this.data[p.index];},
@@ -9,8 +28,8 @@ let env={
 		upd.push(p);
 	},
 	getBlock:function(rx,ry){
-		let x=Math.floormod(rx,this.lenX);
-		let y=Math.floormod(ry,this.lenY);
+		let x=floormod(rx,this.lenX);
+		let y=floormod(ry,this.lenY);
 		let i=x+y*this.lenX;
 		return this.blockBuffer[i]||(this.blockBuffer[i]=new this.Block(x,y,i));
 		//return new this.Block(x,y,i);

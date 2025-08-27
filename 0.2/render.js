@@ -1,9 +1,11 @@
+function part(l,n,a){let d=l/n;return [~~(a*d),~~((a+1)*d)-~~(a*d)]}
+
 let RAF=(window.requestAnimationFrame||window.webkitRequestAnimationFrame||window.mozRequestAnimationFrame||window.oRequestAnimationFrame||window.msRequestAnimationFrame||function(callback){window.setTimeout(callback, 1000 / 60);}).bind(window);
 let ctx,imgData;
 function updateRender(p){
 	let e=env.get(p);
-	let xp=Math.part(canvas.width,env.lenX,p.x);
-	let yp=Math.part(canvas.height,env.lenY,p.y);
+	let xp=part(canvas.width,env.lenX,p.x);
+	let yp=part(canvas.height,env.lenY,p.y);
 	let xl=xp[1],yl=yp[1];
 	let ixl=1/xl,iyl=1/yl;
 	let r=e instanceof Object&&e.render instanceof Function;
