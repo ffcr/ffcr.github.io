@@ -20,6 +20,10 @@ canvas {
 <input type="number" value="20" id="SPEED"  onchange="this.value=Math.max(1,Math.min(this.value,1000))"/>
 刻
 <input type="submit" id="PAUSE" value="点击暂停" onclick="this.value=(this.pause=!this.pause)?'已暂停，点击继续':'点击暂停'">
+<br>
+<input type="checkbox" id="showActive" checked />显示有能量程序</input>
+<input type="checkbox" id="showInactive" checked />显示无能量程序</input>
+<input type="checkbox" id="showData"  />显示数据</input>
 </div>
 <script>
 	function download(file,str){
@@ -41,31 +45,37 @@ canvas {
 	}
 </script>
 <div>
-	<input type="submit" id="SAVE" value="保存世界" onclick="download(new Date().toLocaleString('sv').replaceAll(/[:\-]/g,'').replaceAll(' ','-')+'.save.js',uneval(worldToSerializable(WORLD)))">
+	<input type="submit" id="SAVE" value="保存世界" onclick="download(new Date().toLocaleString('sv').replaceAll(/[:\-]/g,'').replaceAll(' ','-')+'.save.js',uneval(WORLD))">
 	<label style="background: white; color: black; border-radius: 2px; cursor: pointer;">加载世界
-		<input type="file" id="fileInput" style="display: none;" onchange="upload(str=>WORLD=worldFromSerializable(Function(str)()));this.value=''">
+		<input type="file" id="fileInput" style="display: none;" onchange="upload(str=>{WORLD=(0,eval)(str)});this.value=''">
 	</label>
-	<input type="submit" id="QUINE_EXAMPLE" value="代码样例：QUINE（自复制程序）" style="color: green;" onclick="openTextEditor('样例程序',QUINE,text=>{WORLD[y][x]=text},event.clientX,event.clientY*0.6);">
+	<input type="submit" value="程序样例：自复制" style="color: green;" onclick="showExample('replicator');">
+	<input type="submit" value="程序样例：高效收割者" style="color: green;" onclick="showExample('harvester');">
+	<input type="submit" value="程序样例：回收者" style="color: green;" onclick="showExample('recycler');">
 </div>
-
 <script>
-// C(PC)：百分号 %25
-// L(LF)：换行 %1A
-// Q(EQ)：等号 %3D
-// H：头 %48
-// T：尾 %54
-globalThis.QUINE=`
-%3D%503D=%3D%503D
-%50=%25
-%4C=%0A
-%54=%0A%3D%2548%2548%2554
-%51=%3D
-%48=P3DP503DQP3DP503DLP50QP25LP4CQP0ALP54QP0AP3DP2548P2548P2554LP51QP3DLP48Q
-=%48%48%54
-`.trim();
-console.log('gene=',QUINE.slice(0,QUINE.indexOf('%48=')+'%48='.length).replaceAll('\n','L').replaceAll('%','P').replaceAll('=','Q'))
-
+globalThis.showExample=function(name){openTextEditor('样例程序',EXAMPLES[name],text=>{},event.clientX,event.clientY*0.6)}
+globalThis.EXAMPLES={
+replicator:`
+//来源：经过半小时的进化撞出来的
+//收割获取能量的同时会进行“播种”（复制自身程序比起随便放下一个程序需要消耗更多能量）
+//“种子”借助环境扰动得到能量启动
+new Root(ENERGY_GIVE(GT(SHL(MOVE(HOME(),LT(NEG(ENERGY()),GTE(ENERGY(),HOME()))),TREE_RECYCLE(TREE_MUTATE(P_COPY(),ENERGY_GET(),I32(0)))),TREE_RECYCLE(P_SWAP(SELF_COPY())))),20000);
+`,
+harvester:`
+//资源密集时投放才容易存活
+//比较高效地获取能量（收割时会放下最简单的程序）
+//借助环境扰动有小概率复制
+new Root(COMMA(LTE(NE(HOME(),ROTATE(REM(MOVE(I32(0),EQZ(MOVE(I32(0),I32(0)))),I32(0)))),TREE_RECYCLE(P_SWAP(ZERO_TREE()))),ZERO_TREE()),10000)
+`,
+recycler:`
+//当回收比生产能得到更多能量时，就可以让能量随着时间自发增加
+//借助环境扰动有小概率复制
+new Root(COMMA(O_SWAP(ZERO_TREE()),TREE_RECYCLE(O_SWAP(P_SWAP(SELF_COPY())))),10000)
+`,
+}
 </script>
+
 <script>
 	document.addEventListener('dragover',  (e) => {
 		e.preventDefault();  // 覆盖浏览器默认阻止行为
@@ -107,7 +117,7 @@ console.log('gene=',QUINE.slice(0,QUINE.indexOf('%48=')+'%48='.length).replaceAl
 
 
 <script type="module">
-	import {tickLogic,renderLogic} from "./stringRewriting.js";
+	import {tickLogic,renderLogic} from "./treeLang.js";
 	let toTick=0,lastTime=new Date();
 	function runTickLoop(){
 		if(document.getElementById('PAUSE').pause){lastTime=new Date();return;}
@@ -132,8 +142,8 @@ console.log('gene=',QUINE.slice(0,QUINE.indexOf('%48=')+'%48='.length).replaceAl
 	let canvas=document.getElementById('canvas');
 	canvas.onmousedown=function(ev){
 		const width=WORLD[0].length,height=WORLD.length;
-		let x=ev.offsetX*width/canvas.offsetWidth|0,y=ev.offsetY*height/canvas.offsetHeight|0,E=WORLD[y][x];
-		openTextEditor('修改('+x+','+y+')处程序',E,text=>{WORLD[y][x]=text},ev.clientX,ev.clientY);
+		let x=ev.offsetX*width/canvas.offsetWidth|0,y=ev.offsetY*height/canvas.offsetHeight|0,E=uneval(WORLD[y][x]);
+		openTextEditor('修改('+x+','+y+')处程序',E,text=>{WORLD[y][x]=(0,eval)(text)},ev.clientX,ev.clientY);
 	}
 </script>
 

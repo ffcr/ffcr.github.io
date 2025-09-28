@@ -5,7 +5,7 @@ function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random
 /**@param {number[]} acc @param {number} x */
 function binSearch(acc,x){let a=0,b=acc.length;while(a<=b){let m=a+b>>>1;if(acc[m]>x)b=m-1;else a=m+1;}return a;}
 
-const RANDSELECTED=[...'\n\n\n\n====%%%%0123456789ABCDEF','%3D','%3D','%3D','%3D','%0A','%0A','%0A','%0A'];
+const RANDSELECTED=[...'\n\n\n\n====%%%%0123456789ABCDEF','%3D','%3D','%3D','%3D','%0A','%0A','%0A','%0A',...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
 function runRules(s,rules){
     for(let i=0;i<rules.length;i++){
         let r=rules[i],replaced=false;
@@ -46,7 +46,7 @@ function tick(world,x0,y0){
         size_change+=s1.length-s.length;
         world[y][x]=s1;
     }
-    if(size_change===0&&Math.random()<1/8)
+    if(Math.random()<1/8)
     if(Math.random()<1/2){
         let i=Math.random()*(self.length+1)>>>0;
         let s=sample(RANDSELECTED);if(Math.random()>1/1024)s=s.slice(0,self.length-i);
@@ -123,7 +123,6 @@ function renderLogic(){
 
 globalThis.uneval=function(x,recorded=new Map()){
     let codes=[];let allocVar=(prefix,val)=>{let v=prefix+recorded.size;recorded.set(val,v);return v;}
-    let numToString=n=>OPCODE_TO_NAME.get(n)??(Math.abs(n)<0x8000?n.toString():'0x'+(n>>>0).toString(16)+'|0');
     let recursiveUneval=x=>{
         switch(typeof x){
             case "string":return JSON.stringify(x);case "boolean":case "number":case "undefined":return String(x);case "bigint":return x<1n<<20n&&x>-1n<<20n?String(x)+'n':'0x'+x.toString(16)+'n';
