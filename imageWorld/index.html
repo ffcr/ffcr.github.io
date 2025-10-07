@@ -4,24 +4,19 @@
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>世界运行</title>
 <style>
-canvas {
-  image-rendering: pixelated;
+[draggable=true]{
+	cursor: move;
+}
+canvas{
+	image-rendering: pixelated;
+}
+body{
+	background-color: black; /* text-align: center;  margin: 0 auto;*/
 }
 </style>
 </head>
 
-<body style="background-color: black;">
-
-<canvas id="canvas" width=512 height=512 style="width:512px;height:512px"></canvas>
-<div style="color:white">
-点击图案：左键查看与编辑程序，右键以此为原型随机生成程序相似的图案
-<br>
-运行速度：每秒
-<input type="number" value="20" id="SPEED"  onchange="this.value=Math.max(1,Math.min(this.value,1000))"/>
-刻
-<input type="submit" id="PAUSE" value="点击暂停" onclick="this.value=(this.pause=!this.pause)?'已暂停，点击继续':'点击暂停'">
-<br>
-</div>
+<body>
 <script>
 	function download(file,str){
 		const blob = new Blob([str], { type: 'text/plain;charset=utf-8' }); 
@@ -41,68 +36,64 @@ canvas {
 		reader.readAsText(file);
 	}
 </script>
-<div>
-	<input type="submit" id="SAVE" value="保存世界" onclick="download(new Date().toLocaleString('sv').replaceAll(/[:\-]/g,'').replaceAll(' ','-')+'.save.js',uneval(WORLD))">
-	<input type="button" value="加载世界" id="fakeFileInput" onclick="document.getElementById('fileInput').click();"/>
-	<input type="file" id="fileInput" style="display: none; width: 0;" onchange="upload(str=>{WORLD=(0,eval)(str)});this.value=''">
+<div style="color:white;width: min-content;">
+	<div style="display: inline; float: left;">
+		运行速度：每秒
+		<input type="number" style="width: 8ch;" value="20" id="SPEED"/>
+		刻
+		<input type="submit" id="PAUSE" value="点击暂停" onclick="this.value=(this.pause=!this.pause)?'已暂停，点击继续':'点击暂停'">
+	</div>
+	<div style="display: inline; float: right;">
+		<input type="button" value="加载世界" id="fakeFileInput" onclick="document.getElementById('fileInput').click();"/>
+		<input type="file" id="fileInput" style="display: none; width: 0;" onchange="upload(str=>{WORLD=(0,eval)(str)});this.value=''">
+		<input type="submit" id="SAVE" value="保存世界" onclick="download(new Date().toLocaleString('sv').replaceAll(/[:\-]/g,'').replaceAll(' ','-')+'.save.js',uneval(WORLD))">
+	</div>
+	<canvas id="canvas" width=512 height=512 style="width:512px;height:512px"></canvas>
 </div>
+
 <div style="color:white">
-	<input type="submit" value="随机生成" style="color: green;" onclick="openTextEditor('请粘贴程序原型（留空则完全随机）',globalThis.PROGRAM_PROTOTYPE??'',text=>{globalThis.PROGRAM_PROTOTYPE=text;let tokens=(0,eval)(text).source;randGenWorld(text.trim()===''?[]:tokens,tokens.length)},event.clientX,event.clientY*0.5);">
+	点击一格：<input type="submit" id="buttonForEdit" value="左键⟳">查看与编辑程序，<input type="submit" id="buttonForGen" value="右键⟳">以此为原型随机生成相似图案
+	<br>
+	<input type="submit" value="随机生成" style="color: green;" onclick="openTextEditor('请粘贴程序原型（留空则完全随机）',globalThis.PROGRAM_PROTOTYPE??'',text=>{globalThis.PROGRAM_PROTOTYPE=text;let tokens=text.trim()===''?[]:(0,eval)(text).source;randGenWorld(tokens,Math.max(tokens.length,10))},event.pageX,event.pageY*0.5);">
 	<input type="submit" value="程序样例：康威生命游戏" style="color: green;" onclick="showExample('GOL');">
 	<br>
 	每
-	<input type="number" value="1" id="AUTO_SEARCH_DELAY"  onchange="this.value=Math.max(1,Math.min(this.value,1000))"/>
-	秒自动筛选特征特殊的图案并据此随机生成图案
-	<input type="submit" id="AUTO_SEARCH" value="自动生成已启用" onclick="this.value=(this.pause=!this.pause)?'已暂停自动生成':'自动生成已启用'">
+	<input type="number" value="20" id="AUTO_SEARCH_DELAY"/>
+	刻
+	<input type="submit" id="AUTO_SEARCH" value="自动筛选特征特殊图案并据此随机生成图案" onclick="this.value=(this.pause=!this.pause)?'自动生成图案已禁用':'自动筛选特征特殊图案并据此随机生成图案'">
 
 </div>
 <script>
-globalThis.showExample=function(name){openTextEditor('样例程序',EXAMPLES[name],text=>{},event.clientX,event.clientY*0.6)}
+globalThis.showExample=function(name){openTextEditor('样例程序',EXAMPLES[name],text=>{},event.pageX,event.pageY*0.6)}
 globalThis.EXAMPLES={
 	GOL:'ImgChunk.fromCode("== 3 | round G 0 0 "+Array.from([-1,0,1],y=>Array.from([-1,0,1],x=>x===0&&y===0?"":"+ round G "+x+" "+y+" ")).flat().join("")+"* 0 H= / 1 3")'
 }
-
-function autoSearch(){
-	let t0=autoSearch.time??=new Date(),t1=new Date();if(t1-t0>1000*document.getElementById("AUTO_SEARCH_DELAY").value){
-		autoSearch.time=t1;if(!document.getElementById("AUTO_SEARCH").pause)searchMostSpecial();
-	}
-}
-setInterval(autoSearch,100);
+globalThis.BUTTON_FOR_EDIT=0;{let a=document.getElementById('buttonForEdit'),b=document.getElementById('buttonForGen');a.onclick=b.onclick=e=>{[a.value,b.value]=[b.value,a.value];BUTTON_FOR_EDIT^=1;}}
 </script>
 
 <script>
-	document.addEventListener('dragover',  (e) => {
-		e.preventDefault();  // 覆盖浏览器默认阻止行为
-	});
-	function openTextEditor(title,currentText, onSave,x=0,y=0) {
+	function openTextEditor(title,currentText,onSave,x0=0,y0=0) {
 		const editor = document.createElement('div');
-		editor.innerHTML = `
+		editor.innerHTML=`
 			<div>${title}</div>
 			<textarea style="display:block;width:300px;height:150px;margin-bottom:8px">${currentText}</textarea>
 			<button style="float: right;" class="confirm">确认</button>
 			<button style="float: right;" class="cancel">取消</button>
 		`;
-		editor.style.cssText = `background-color:white;position:absolute;z-index:${openTextEditor.zIndex++}`;
-		editor.style.left  = x  + 'px';
-		editor.style.top  = y  + 'px';
-		editor.draggable=true;
-		let dx,dy;
-		editor.addEventListener('dragstart',  (e) => {
-			const rect = editor.getBoundingClientRect();
-			dx = e.clientX-rect.left;
-			dy = e.clientY-rect.top;
-		});
-		editor.addEventListener('dragend',  (e) => {
-			e.preventDefault(); 
-			editor.style.left  = e.clientX-dx  + 'px';
-			editor.style.top  = e.clientY-dy  + 'px';
-		});
-
-		editor.querySelector('.confirm').onclick = () => {
+		editor.style.cssText=`background-color:white;position:absolute;z-index:${openTextEditor.zIndex++};touch-action:none;`;
+		editor.style.left='0px';editor.style.top='0px';
+		let ex,ey,tr=(x,y)=>{ex=x;ey=y;editor.style.transform =`translate(${x}px,${y}px)`};tr(x0,y0);
+		let dx,dy,xOf=e=>e.pageX||[...e.touches].at(-1).pageX,yOf=e=>e.pageY||[...e.touches].at(-1).pageY;editor.draggable=true;
+		/**@template T @param {T} f*/let assign=(o,k,f)=>o[k]=f;let fns={};
+		editor.addEventListener('dragstart',assign(fns,'dragstart',e=>{e.touches&&e.preventDefault;dx=xOf(e)-ex;dy=yOf(e)-ey;}));
+		editor.addEventListener('drag',assign(fns,'drag',e=>{e.touches&&e.preventDefault;tr(xOf(e)-dx,yOf(e)-dy);}));
+		for(let [i,f] of [['dragend',fns.drag],['touchstart',fns.dragstart],['touchmove',fns.drag]])editor.addEventListener(i,f,{passive:true});
+		
+		editor.querySelector('.confirm').onclick=() => {
 			onSave(editor.querySelector('textarea').value);
 			document.body.removeChild(editor);
 		};
-		editor.querySelector('.cancel').onclick = () => document.body.removeChild(editor);
+		editor.querySelector('.cancel').onclick=() => document.body.removeChild(editor);
 
 		document.body.appendChild(editor);
 	}
@@ -134,10 +125,11 @@ setInterval(autoSearch,100);
 
 
 	let canvas=document.getElementById('canvas');
-	canvas.onmouseup=function(ev){
-		const width=WORLD[0].length,height=WORLD.length;
-		let x=ev.offsetX*width/canvas.offsetWidth|0,y=ev.offsetY*height/canvas.offsetHeight|0,E=uneval(WORLD[y][x]);
-		if(ev.button===0)openTextEditor('修改('+x+','+y+')处程序',E,text=>{WORLD[y][x]=(0,eval)(text)},ev.clientX,ev.clientY);
+	canvas.onmouseup=canvas.ontouchend=function(ev){
+		ev=ev instanceof TouchEvent?[...ev.touches].at(-1):ev;
+		let rect=canvas.getBoundingClientRect();
+		let [x,y]=[(ev.clientX-rect.left)/canvas.offsetWidth*WORLD[0].length|0,(ev.clientY-rect.top)/canvas.offsetHeight*WORLD.length|0];
+		if(((ev.button??0)===0)===(BUTTON_FOR_EDIT===0))setTimeout(()=>openTextEditor('修改('+x+','+y+')处程序',uneval(WORLD[y][x]),text=>{WORLD[y][x]=(0,eval)(text)},ev.pageX,ev.pageY),0);
 		else {randGenWorld(WORLD[y][x].source,WORLD[y][x].source.length);}
 	}
 	canvas.oncontextmenu=ev=>false

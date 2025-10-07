@@ -6,12 +6,22 @@ function randTakeOut(a){let i=a.length*Math.random()>>>0,j=a.length-1;[a[i],a[j]
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 /**@param {number[]} acc @param {number} x */
 function binSearch(acc,x){let a=0,b=acc.length;while(a<=b){let m=a+b>>>1;if(acc[m]>x)b=m-1;else a=m+1;}return a;}
-/**@param {number[][]} vecs */
-function vectorsInfo(vecs){
-    let dim=vecs[0].length,avg=Array.from(Array(dim),()=>0);for(let v of vecs)for(let i=0;i<dim;i++)avg[i]+=v[i];for(let i=0;i<dim;i++)avg[i]/=vecs.length;
-    let dist2=vecs.map(v=>v.reduce((s,x,i)=>s+(x-avg[i])**2,0)),std=(dist2.reduce((x,y)=>x+y,0)/vecs.length)**.5;
-    return {avg,std,vectors:vecs.map((v,i)=>({vector:v,dist2:dist2[i]}))}
-}
+
+
+/**@template T @param {(any,any)=>T} f*/
+function vecFn(f,a,b){return Array.from(a,(_,i)=>f(a[i],b[i]))}
+/**@template T @param {T[][]} m*/
+function transpose(m) {return m[0].map((_,i)=>m.map(row=>row[i]));}
+
+/**@param {number[]} a*/
+function sum(a){return a.reduce((x,y)=>x+y,0)}
+/**@param {number[]} a*/
+function avg(a){return sum(a)/a.length}
+/**@param {number[]} a*/
+function std(a,AVG=avg(a)){let s=0;for(let i=0;i<a.length;i++)s+=(a[i]-AVG)**2;return (s/a.length)**.5}
+
+/**@param {number} n*/
+function sumBits(n){let i=0;while(n){n&=n-1;i++}return i}
 
 
 /**@param {number} h @param {number} s @param {number} v  */
@@ -172,7 +182,7 @@ globalThis.ImgChunk=class{
         this.renderFunc=Function('for(let i=0,hsv=this.hsv,img=this.img.data,y=0;y<16;y++)for(let x=0;x<16;x++,i+=4){let a=0,b=0,c=0,d=0,r='+runTree(expr)+';hsv[i+2]=r;if(typeof r!=="number")throw this}');
     }
     render(){
-        this.hsv.fill(1);this.renderFunc();let clamp=x=>x>1?1:x>0?x:0;
+        this.hsv.fill(.5);this.renderFunc();let clamp=x=>x>1?1:x>0?x:0;
         for(let i=0,img=this.img.data;i<this.hsv.length;i+=4){
             let [r,g,b]=hsvToRgb(clamp(this.hsv[i]),clamp(this.hsv[i+1]),clamp(this.hsv[i+2]));
             if(r!=r||b!=b||g!=g)throw [r,g,b];
@@ -185,11 +195,10 @@ globalThis.ImgChunk=class{
         ImgChunk.TEMP_IMG.set(data);
         data.set(other.img.data);
         this.render();
-        let features=[0,0,0,0,0,0];
-        for(let rgb=0;rgb<3;rgb++){
-            let n=data.length/4,avg=0,std=0;for(let i=0;i<n;i++)avg+=data[4*i+rgb];avg/=n;features[2*rgb]=avg;
-            for(let i=0;i<n;i++)std+=(data[4*i+rgb]-avg)**2;std/=n;std**=.5;features[2*rgb+1]=std;
-        }
+        let features=[0,0,0,255,255,255,0,0,0];
+        for(let i=0;i<data.length;i+=4)for(let rgb=0;rgb<3;rgb++){
+            let c=data[i+rgb];features[0+rgb]+=c;features[3+rgb]=Math.min(features[3+rgb],c);features[6+rgb]=Math.max(features[6+rgb],c);
+        }for(let i=0;i<features.length;i++)features[i]/=255;
         data.set(ImgChunk.TEMP_IMG);
         return features;
     }
@@ -205,20 +214,15 @@ function grid2D(width,height,f){
     return Array.from(Array(height),(_,y)=>Array.from(Array(width),(_,x)=>f(x,y)))
 }
 
-let exprGenerator=ImgChunk.builder(),randToken=function(){let values=[...INSTS.values()];return ()=>sample(values)}();
+let randToken=function(){let values=[...INSTS.values()];return ()=>sample(values)}();
 globalThis.randFunctionFromTokens=(tokens0,limit)=>{
-    let tokens=tokens0.concat();
-    if(Math.random()>1/2){
-        let i=Math.random()*tokens0.length>>>0,j=Math.random()*tokens0.length>>>0;if(i>j)[i,j]=[j,i];
-        tokens=shuffle([tokens0.slice(0,i),tokens0.slice(i,j),tokens0.slice(j)]).flat();
-    }
-    tokens.length=Math.random()*tokens.length>>>0;
-    let result=exprGenerator(tokens)[0];
+    let tokens=tokens0.slice(0,Math.random()*tokens0.length>>>0);
+    let exprGenerator=ImgChunk.builder(),result=exprGenerator(tokens)[0];
     for(let i=0;!result;i++){let token=randToken();if(token.type.length>2&&Math.random()*limit<i)continue;result=exprGenerator([token])[0];}
     return result
 }
 globalThis.randGenWorld=(tokens0,limit)=>{
-    WORLD.forEach(line=>line.forEach((_,i)=>{if(Math.random()>1/16)return;line[i]=Math.random()<1/8?ImgChunk.builder()(tokens0)[0]:randFunctionFromTokens(tokens0,limit)}));
+    WORLD.forEach(line=>line.forEach((_,i)=>{if(Math.random()>1/16)return;line[i]=randFunctionFromTokens(tokens0,limit)}));
 }
 globalThis.WORLD=grid2D(16,16,(x,y)=>{
     if((x=>x&x-1)(x+16*y)===0)console.log('generating:',{x,y})
@@ -230,7 +234,11 @@ globalThis.WORLD=grid2D(16,16,(x,y)=>{
 
 
 function randomIterOrder(world){let w=world[0].length,h=world.length,order=Array.from(Array(w*h),(_,i)=>[i%w,i/w|0]);shuffle(order);return order}
+globalThis.TICK=0;
 function tickLogic(){
+    TICK++;
+    if(TICK%document.getElementById("AUTO_SEARCH_DELAY").value===0&&!document.getElementById("AUTO_SEARCH").pause)searchMostSpecial();
+    
     const width=WORLD[0].length,height=WORLD.length;
     for(let [ex,ey] of randomIterOrder(WORLD)){
         let f=WORLD[ey][ex];
@@ -240,30 +248,38 @@ function tickLogic(){
 }
 
 globalThis.searchMostSpecial=function(){
-    let exampleChunks=randomIterOrder(WORLD).slice(0,16).map(([x,y])=>WORLD[y][x]);
+    const width=WORLD[0].length,height=WORLD.length;
+    let exampleChunks=randomIterOrder(WORLD).slice(0,32).map(([x,y])=>WORLD[y][x]);
     let featurers=randomIterOrder(WORLD).map(([x,y])=>{
         let chunk=WORLD[y][x];
-        let info=vectorsInfo(exampleChunks.map(c=>chunk.feature(c)));
-        return {x,y,chunk,info,score:info.std}
-    }).sort((x,y)=>y.score-x.score);featurers.length=16;
-    // console.log('good featurers:',featurers.map(({x,y})=>'('+x+','+y+')').join(' '));
+        let features=exampleChunks.map(c=>chunk.feature(c).map(x=>x>=.5?1:0));
+        let feature=transpose(features).map((a,i)=>{let r=avg(a);return {index:i,target:r<.5?1:0,score:r===0||r===1?0:Math.max(0,Math.abs(2*r-1)-3/8)}}).sort((a,b)=>b.score-a.score)[0];
+        return {x,y,chunk,score:feature.score,index:feature.index,target:feature.target}
+    })
+    featurers.forEach(e=>e.score-=.125*(e.chunk.source.length/32)**2);featurers.sort((x,y)=>y.score-x.score);
+    // let goodFeaturers=featurers.filter(({score},i)=>i<featurers.length/16||score>featurers[featurers.length>>>1].score);
+    let goodFeaturers=featurers.slice(0,16);
+    // console.log('good featurers:',goodFeaturers.map(({x,y,score})=>'('+x+','+y+'):'+score).join(' '));
 
-    let chunks=randomIterOrder(WORLD).map(([x,y])=>({x,y,chunk:WORLD[y][x],score:0}));
+    let renderers=randomIterOrder(WORLD).map(([x,y])=>({x,y,chunk:WORLD[y][x],score:0}));
     
-    for(let featurer of featurers){
-        let info=vectorsInfo(chunks.map(c=>featurer.chunk.feature(c.chunk)));
-        chunks.forEach((data,i)=>data.score+=info.vectors[i].dist2/info.std**2);
+    for(let featurer of goodFeaturers){
+        let features=renderers.map(c=>featurer.chunk.feature(c.chunk).map(x=>x>=.5?1:0));
+        renderers.forEach((e,i)=>e.score+=features[i][featurer.index]===featurer.target?featurer.score:0);
     }
-    chunks.forEach(data=>data.score/=(50+data.chunk.source.length));
-    chunks.sort((x,y)=>y.score-x.score);chunks.length=16;
-    // console.log('good images:',chunks.map(({x,y})=>'('+x+','+y+')').join(' '));
+    renderers.forEach(e=>e.score-=(e.chunk.source.length/32)**2);renderers.sort((x,y)=>y.score-x.score);
+    // let goodRenderers=renderers.filter(({score})=>score>renderers[renderers.length>>>1].score);
+    let goodRenderers=renderers.slice(0,16);
+    // console.log('good images:',goodRenderers.map(({x,y,score})=>'('+x+','+y+'):'+score).join(' '));
 
-    let pool=chunks.concat(),safe=featurers.concat(chunks);
-    changeWorld:for(let [x,y] of randomIterOrder(WORLD).slice(0,WORLD.length*WORLD[0].length>>>3)){
-        for(let {x:sx,y:sy} of safe){if(x===sx&&y===sy)continue changeWorld}
-        let src1=sample(pool).chunk.source,src2=sample(pool).chunk.source,pos=Math.random();
-        let src=src1.slice(0,pos*src1.length).concat(src2.slice(pos*src2.length));
-        WORLD[y][x]=randFunctionFromTokens(src,Math.min(50,src.length))
+    let toChange=grid2D(width,height,(x,y)=>true);
+    for(let {x,y} of goodRenderers)toChange[y][x]=false;for(let {x,y} of goodFeaturers)toChange[y][x]=false;
+    let pool=goodRenderers.concat(goodFeaturers),pool2=goodRenderers.concat(goodFeaturers);
+    for(let [x,y] of randomIterOrder(WORLD)){
+        if(Math.random()>.25||!toChange[y][x])continue;
+        let src1=sample(pool).chunk,src2=sample(pool2).chunk,pos=Math.random();
+        let src=src1.source.slice(0,pos*src1.source.length).concat(src2.source.slice(pos*src2.source.length));
+        WORLD[y][x]=randFunctionFromTokens(src,Math.max(20,src.length))
     }
 }
 
@@ -282,6 +298,7 @@ function renderLogic(){
         ctx.putImageData(WORLD[y][x].img,x*cellSize,y*cellSize);
     }
 }
+
 
 
 export {tickLogic,renderLogic}
