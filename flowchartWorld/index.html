@@ -4,9 +4,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>世界运行</title>
 <style>
-[draggable=true]{
-	cursor: move;
-}
+[draggable=true]{cursor: move;}
 canvas{
 	image-rendering: pixelated;
 }
@@ -19,24 +17,17 @@ body{
 <body>
 <script>
 	function download(file,str){
-		const blob = new Blob([str], { type: 'text/plain;charset=utf-8' }); 
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href=url;a.download=file;
-		document.body.appendChild(a);a.click();
-		setTimeout(() => {document.body.removeChild(a);URL.revokeObjectURL(url);}, 0); 
+		const blob=new Blob([str],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);
+		const a=document.createElement('a');a.href=url;a.download=file;document.body.appendChild(a);a.click();
+		setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},0); 
 	}
 	function upload(then) {
-		const fileInput = document.getElementById('fileInput');
-		
-		const file = fileInput.files[0];if(!file)return;
-		const reader = new FileReader();
-		reader.onload = function (e) {then(e.target.result);};
-		reader.onerror = function () {console.error(" 读取失败:", reader.error);};
-		reader.readAsText(file);
+		const fileInput=document.getElementById('fileInput');const file=fileInput.files[0];if(!file)return;
+		const reader=new FileReader();reader.onerror=function(){console.error("读取失败:", reader.error);};
+		reader.onload=function(e){then(e.target.result);};reader.readAsText(file);
 	}
 </script>
-<div style="color:white;width: min-content;">
+<div style="color:white;width: 512px;">
 	<div style="display: inline; float: left;">
 		运行速度：每秒
 		<input type="number" style="width: 8ch;" value="20" id="SPEED"/>
@@ -44,49 +35,86 @@ body{
 		<input type="submit" id="PAUSE" value="点击暂停" onclick="this.value=(this.pause=!this.pause)?'已暂停，点击继续':'点击暂停'">
 	</div>
 	<div style="display: inline; float: right;">
-		<input type="button" value="加载世界" id="fakeFileInput" onclick="document.getElementById('fileInput').click();"/>
+		<input type="button" value="加载世界" onclick="document.getElementById('fileInput').click();"/>
 		<input type="file" id="fileInput" style="display: none; width: 0;" onchange="upload(str=>{WORLD=(0,eval)(str)});this.value=''">
-		<input type="submit" id="SAVE" value="保存世界" onclick="download(new Date().toLocaleString('sv').replaceAll(/[:\-]/g,'').replaceAll(' ','-')+'.save.js',uneval(WORLD))">
+		<input type="submit" value="保存世界" onclick="download(new Date().toLocaleString('sv').replaceAll(/[:\-]/g,'').replaceAll(' ','-')+'.save.js',uneval(WORLD))">
 	</div>
-	<canvas id="canvas" width=512 height=512 style="width:512px;height:512px"></canvas>
 </div>
+<canvas id="canvas" width=512 height=512 style="width:512px;height:512px"></canvas>
 
 <div style="color:white">
-	点击一格：<input type="submit" id="buttonForEdit" value="左键⟳">查看与编辑程序，<input type="submit" id="buttonForGen" value="右键⟳">以此为原型随机生成相似图案
+	红：指令节点；绿：数据节点；白：空白；灰：游离数据；蓝：<b style="color: blue;">深层</b>嵌套世界
 	<br>
-	<input type="submit" value="随机生成" style="color: green;" onclick="openTextEditor('请粘贴程序原型（留空则完全随机）',globalThis.PROGRAM_PROTOTYPE??'',text=>{globalThis.PROGRAM_PROTOTYPE=text;let tokens=text.trim()===''?[]:(0,eval)(text).source;randGenWorld(tokens,Math.max(tokens.length,10))},event.pageX,event.pageY*0.5);">
-	<input type="submit" value="程序样例：康威生命游戏" style="color: green;" onclick="showExample('GOL');">
+    <form>
+		点击一格：
+        <input type="radio" name="clickObjectOption" value="edit" checked>查看与编辑物体&nbsp;
+        <input type="radio" name="clickObjectOption" value="gen">大量生成该物体&nbsp;
+        <input type="radio" name="clickObjectOption" value="jumpIn">进入该世界&nbsp;
+        <input type="button" style="color:aqua;background-color: black;" value="跳出当前世界" onclick="jumpOutWorld()"/>
+    </form>
+	<input type="submit" value="大量生成" style="color: green;" onclick="openTextEditor('大量生成物体',globalThis.PROGRAM_PROTOTYPE??EXAMPLES.REPLICATING,text=>{globalThis.PROGRAM_PROTOTYPE=text;randGenWorld((x,y)=>(0,eval)(text),1/16)},event.pageX,Math.max(0,event.pageY-200));">
+	<input type="submit" value="样例物体：自我复制流程图" style="color: green;" onclick="showExample('REPLICATING');">
 	<br>
-	每
-	<input type="number" value="20" id="AUTO_SEARCH_DELAY"/>
-	刻
-	<input type="submit" id="AUTO_SEARCH" value="自动筛选特征特殊图案并据此随机生成图案" onclick="this.value=(this.pause=!this.pause)?'自动生成图案已禁用':'自动筛选特征特殊图案并据此随机生成图案'">
-
+	渲染精度：每格
+	<input type="number" style="width: 8ch;" step="1" value="16" onchange="this.value=RENDER_CELL_SIZE=Math.max(1,Math.min((2048**2/(d=>d.width*d.height)(globalThis?.WORLD??{width:32,height:32}))**.5|0,this.value|0))" />
+	像素
+	<br>
+	随机修改率：
+	<input type="number" style="width: 12ch;" step="0.001" value="0.005" onchange="this.value=RANDOM_CHANGE_RATE=Math.max(0,Math.min(1,this.value||0))" />
+	，随机注入能量：
+	<input type="number" style="width: 12ch;" step="100" value="500" onchange="this.value=RANDOM_ENERGY_GAIN=Math.max(0,Math.min(Infinity,this.value||0))" />
 </div>
 <script>
-globalThis.showExample=function(name){openTextEditor('样例程序',EXAMPLES[name],text=>{},event.pageX,event.pageY*0.6)}
+//直接将输入框的初始值视作“第一个输入”，走一遍onchange流程，进行变量的初始化，避免了为了初始化重复写变量名与值的代码。
+for(let input of document.querySelectorAll('input'))input.onchange?.();
+
+globalThis.randGenWorld=function(gen,rate){let w=WORLD.width,h=WORLD.height;for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(Math.random()<rate)WORLD.swap(new Pos(x,y),gen(x,y));}
+globalThis.showExample=function(name){openTextEditor('样例物体',EXAMPLES[name],text=>{},event.pageX,Math.max(0,event.pageY-200))}
 globalThis.EXAMPLES={
-	GOL:'ImgChunk.fromCode("== 3 | round G 0 0 "+Array.from([-1,0,1],y=>Array.from([-1,0,1],x=>x===0&&y===0?"":"+ round G "+x+" "+y+" ")).flat().join("")+"* 0 H= / 1 3")'
+REPLICATING:`
+//自我复制流程图：多次放置降低因随机因素灭绝的概率
+//有可能随机进化出跳出世界的指令，当自己所在的世界并非最外层世界时就会跳出
+let width=5,height=5;
+let sample=function(a){return a[a.length*Math.random()>>>0]}
+let shuffle=function(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+let allocPos=function*(){let all=Array.from(Array(height),(_,y)=>Array.from(Array(width),(_,x)=>new Pos(x,y))).flat();for(let p of shuffle(all))yield p}();
+
+let datas={zero:new DataNode(I32,0),x:new DataNode(I32,2),y:new DataNode(I32,1),t:new DataNode(I32,0),threshold:new DataNode(I32,10000),env:new DataNode(Any,undefined)};
+for(let v in datas)datas[v]={pos:allocPos.next().value,node:datas[v]};
+
+let instNodes;with(datas){instNodes=[
+    [ENERGY,t],[GTE,t,t,threshold],[IF,t],
+    [MOVE,x,y],[SELF_COPY,env],[SWAP,env],[RECYCLE,env],
+    [ASSIGN,x,y],[ASSIGN,y,t],[ASSIGN,t,x],[SUB,x,zero,x],[MOVE,x,y],
+];}
+
+let insts=instNodes.map(([inst,...argPoss],i)=>{let pos=allocPos.next().value;return {node:new InstNode(inst,(inst===IF?[Pos.ZERO,Pos.ZERO]:[Pos.ZERO]),argPoss.map(v=>v.pos.sub(pos)),i===0),pos};});
+for(let i=1;i<insts.length;i++)insts[i-1].node.branchPoss[0]=insts[i].pos.sub(insts[i-1].pos);
+
+new Env(width,height,100000).setMultiple([...Object.values(datas),...insts].map(({pos,node})=>[pos.x,pos.y,node]))
+`
 }
-globalThis.BUTTON_FOR_EDIT=0;{let a=document.getElementById('buttonForEdit'),b=document.getElementById('buttonForGen');a.onclick=b.onclick=e=>{[a.value,b.value]=[b.value,a.value];BUTTON_FOR_EDIT^=1;}}
 </script>
 
 <script>
 	function openTextEditor(title,currentText,onSave,x0=0,y0=0) {
-		const editor = document.createElement('div');
+		const editor=document.createElement('div');
 		editor.innerHTML=`
 			<div>${title}</div>
-			<textarea style="display:block;width:300px;height:150px;margin-bottom:8px">${currentText}</textarea>
+			<textarea style="display:block;width:300px;height:150px;margin-bottom:8px;font-family:monospace;">${currentText}</textarea>
 			<button style="float: right;" class="confirm">确认</button>
 			<button style="float: right;" class="cancel">取消</button>
 		`;
 		editor.style.cssText=`background-color:white;position:absolute;z-index:${openTextEditor.zIndex++};touch-action:none;`;
 		editor.style.left='0px';editor.style.top='0px';
-		let ex,ey,tr=(x,y)=>{ex=x;ey=y;editor.style.transform =`translate(${x}px,${y}px)`};tr(x0,y0);
-		let dx,dy,xOf=e=>e.pageX||[...e.touches].at(-1).pageX,yOf=e=>e.pageY||[...e.touches].at(-1).pageY;editor.draggable=true;
-		/**@template T @param {T} f*/let assign=(o,k,f)=>o[k]=f;let fns={};
-		editor.addEventListener('dragstart',assign(fns,'dragstart',e=>{e.touches&&e.preventDefault;dx=xOf(e)-ex;dy=yOf(e)-ey;}));
-		editor.addEventListener('drag',assign(fns,'drag',e=>{e.touches&&e.preventDefault;tr(xOf(e)-dx,yOf(e)-dy);}));
+		/**@template T @param {(any,any)=>T} f*/
+		function vecFn(f,a,b){return Array.from(a,(_,i)=>f(a[i],b[i]))}
+		
+		let ex,ey,tr=(x,y)=>{ex=x;ey=y;editor.style.transform =`translate(${x}px,${y}px)`};tr(x0,y0);editor.draggable=true;
+		let dx,dy,xyOf=e=>e instanceof DragEvent?[e.pageX,e.pageY]:e instanceof TouchEvent?Array.from(e.touches,t=>[t.pageX,t.pageY]).at(-1):'throw unknown event type'();
+		/**@template T @param {T} f*/let assign=(o,k,f)=>o[k]=f;let fns={};let sub=(x,y)=>x-y;
+		editor.addEventListener('dragstart',assign(fns,'dragstart',e=>{[dx,dy]=vecFn(sub,xyOf(e),[ex,ey]);}));
+		editor.addEventListener('drag',assign(fns,'drag',e=>{tr(...vecFn(sub,xyOf(e),[dx,dy]))}));
 		for(let [i,f] of [['dragend',fns.drag],['touchstart',fns.dragstart],['touchmove',fns.drag]])editor.addEventListener(i,f,{passive:true});
 		
 		editor.querySelector('.confirm').onclick=() => {
@@ -116,21 +144,18 @@ globalThis.BUTTON_FOR_EDIT=0;{let a=document.getElementById('buttonForEdit'),b=d
 	setInterval(runTickLoop,1000/60);
 
 	const RAF=(window.requestAnimationFrame||window.webkitRequestAnimationFrame||window.mozRequestAnimationFrame||window.oRequestAnimationFrame||window.msRequestAnimationFrame||function(callback){window.setTimeout(callback, 1000 / 60);}).bind(window);
-	(function runRenderLoop(){
-		renderLogic();
-		window.requestAnimationFrame(runRenderLoop);
-	})();
-
-	
-
+	(function runRenderLoop(){renderLogic();window.requestAnimationFrame(runRenderLoop);})();
 
 	let canvas=document.getElementById('canvas');
 	canvas.onmouseup=canvas.ontouchend=function(ev){
 		ev=ev instanceof TouchEvent?[...ev.touches].at(-1):ev;if(ev==null)return;
 		let rect=canvas.getBoundingClientRect();
-		let [x,y]=[(ev.clientX-rect.left)/canvas.offsetWidth*WORLD.data[0].length|0,(ev.clientY-rect.top)/canvas.offsetHeight*WORLD.data.length|0];
-		if(((ev.button??0)===0)===(BUTTON_FOR_EDIT===0))setTimeout(()=>openTextEditor('修改('+x+','+y+')处程序',uneval(WORLD.data[y][x]),text=>{WORLD.data[y][x]=(0,eval)(text)},ev.pageX,ev.pageY),0);
-		else {randGenWorld(WORLD.data[y][x].source,WORLD.data[y][x].source.length);}
+		let [x,y]=[(ev.clientX-rect.left)/canvas.offsetWidth*WORLD.width|0,(ev.clientY-rect.top)/canvas.offsetHeight*WORLD.height|0];
+		if((ev.button??0)===0)switch(document.querySelector('input[name="clickObjectOption"]:checked').value){
+            case "edit":setTimeout(()=>openTextEditor('修改('+x+','+y+')处物体',uneval(WORLD.get(new Pos(x,y))),text=>{WORLD.swap(new Pos(x,y),(0,eval)(text))},ev.pageX,ev.pageY),0);break
+            case "gen":let s=uneval(WORLD.get(new Pos(x,y)));randGenWorld((x,y)=>(0,eval)(s),1/16);break
+            case "jumpIn":jumpInWorld(x,y);break
+        }
 	}
 	canvas.oncontextmenu=ev=>false
 </script>

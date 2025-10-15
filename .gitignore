@@ -1,3 +1,5 @@
 .vscode/
 update_everything.bat
 tempCodeRunnerFile.*
+httpServer.*
+httpsServer.*

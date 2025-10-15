@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<head>
+    <style></style>
+    <div id="VersionInfo"></div>
+    <script>
+        function getAndroidVersion(ua) {ua = (ua || navigator.userAgent).toLowerCase(); var match = ua.match(/android\s([0-9\.]*)/i);return match ? match[1] : undefined;};
+        function getChromeVersion () {var raw = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);return raw ? parseInt(raw[2], 10) : false;}
+        let VersionInfo=document.getElementById('VersionInfo');
+        VersionInfo.innerText='浏览器环境：'+navigator.userAgent+'\n';
+        VersionInfo.innerText+=(getAndroidVersion()?'检测到Android版本：'+getAndroidVersion()+(parseInt(getAndroidVersion())>=12?'>=12，符合WebGPU最低要求':'<12，⚠️不符合WebGPU最低要求！'):'')+'\n';
+        VersionInfo.innerText+=(getChromeVersion()?'检测到chrome版本：'+getChromeVersion()+(getChromeVersion()>=121?'>=121，符合WebGPU最低要求':'<121，⚠️不符合WebGPU最低要求！'):'')+'\n';
+    </script>
+    <input type="submit" id="TestWebGPU" value="是否支持WebGPU" onclick="alert(navigator.gpu!=null?'理论上支持':'不支持'+(!location.protocol.includes('https')?'，因为IP不是127.0.0.1且协议不是https':'因为浏览器、系统或硬件限制'))"><br>
+    <p>有些时候有些设备虽然看似支持WebGPU，但实际上无法正常渲染图像，因此还是要实测：</p>
+    <a href="https://www.windhc.com/test/webgpu">WebGPU实测网站1</a><br>
+    <a href="https://webgpu.github.io/webgpu-samples/?sample=computeBoids">WebGPU实测网站2</a><br>
+    <a href="https://jtsorlinis.github.io/BoidsWebGPU/">WebGPU实测网站3</a><br>
+    <p>如果渲染正常则说明是支持的</p>
+    
+    <script>Object.defineProperty(Object.prototype,'getSelf',{value:function(){return this},enumerable:false,writable:true});</script>
+    <input type="submit" id="TestPrototype" value="测试原型链" onclick="alert(new Map([[TestPrototype,'按钮'],[window,'窗口']]).get(getSelf()))"> 
+</head>
+<body>
+    <script>
+        let str = "包含控制字符：";
+        for (let i = 0x10; i <= 0x1F; i++) {
+            str += String.fromCharCode(i) + " ";
+        }
+        document.getElementById("display-area").textContent = str;
+    </script>
+</body>
+
+</html>
